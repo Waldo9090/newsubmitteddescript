@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Switch } from "@/components/ui/switch"
 import { Camera } from "lucide-react"
 import SlackConnection from "../../integrations/components/SlackConnection"
 import NotionConnection from "../../integrations/components/NotionConnection"
@@ -94,56 +93,6 @@ export default function AccountSettings() {
           <LinearConnection />
         </div>
       </div>
-
-      <Card className="p-6">
-        <h3 className="text-lg font-medium mb-4">Password</h3>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="current-password">Current password</Label>
-            <Input id="current-password" type="password" />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="new-password">New password</Label>
-            <Input id="new-password" type="password" />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm new password</Label>
-            <Input id="confirm-password" type="password" />
-          </div>
-
-          <Button>Update Password</Button>
-        </div>
-      </Card>
-
-      <Card className="p-6">
-        <h3 className="text-lg font-medium mb-4">Preferences</h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="dark-mode">Dark mode</Label>
-            <Switch id="dark-mode" />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Label htmlFor="desktop-notifications">Desktop notifications</Label>
-            <Switch id="desktop-notifications" defaultChecked />
-          </div>
-        </div>
-      </Card>
-
-      <Card className="p-6">
-        <h3 className="text-lg font-medium mb-4">Danger Zone</h3>
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <p className="font-medium">Delete account</p>
-              <p className="text-sm text-muted-foreground">Permanently delete your account and all associated data.</p>
-            </div>
-            <Button variant="destructive">Delete Account</Button>
-          </div>
-        </div>
-      </Card>
     </div>
   )
 }

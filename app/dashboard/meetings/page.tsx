@@ -221,16 +221,17 @@ export default function MeetingsPage() {
   };
 
   const content = (
-    <div className="p-6 w-full">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Meetings</h1>
+    <div className="w-full max-w-7xl mx-auto">
+      <div className="flex justify-between items-center mb-6 px-6">
+        <h1 className="text-2xl font-semibold">Meetings</h1>
       </div>
 
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-6 flex flex-wrap gap-2 px-6">
         <Button 
           variant={activeTag === null ? "default" : "outline"} 
           size="sm" 
           onClick={() => setActiveTag(null)}
+          className="transform transition-all hover:scale-105 active:scale-95"
         >
           All
         </Button>
@@ -240,53 +241,54 @@ export default function MeetingsPage() {
             variant={activeTag === tag ? "default" : "outline"}
             size="sm"
             onClick={() => setActiveTag(tag)}
+            className="transform transition-all hover:scale-105 active:scale-95"
           >
             {tag}
           </Button>
         ))}
       </div>
 
-      <div className="space-y-4 w-full">
+      <div className="w-full divide-y">
         {filteredMeetings.map((meeting) => (
-          <Card
+          <div
             key={`${meeting.name}-${meeting.timestamp}`}
-            className="p-4 hover:shadow-md transition-shadow cursor-pointer w-full"
+            className="w-full px-6 py-4 hover:bg-accent/5 transition-all duration-200 cursor-pointer transform hover:scale-[1.01] active:scale-[0.99]"
             onClick={() => handleMeetingClick(meeting)}
           >
-            <div className="flex items-start justify-between w-full">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{meeting.emoji}</span>
-                  <h3 className="text-lg font-medium">{meeting.title}</h3>
-                </div>
-                <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    <span>{formatDate(meeting.timestamp, "MMM d, yyyy")}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>{formatDate(meeting.timestamp, "h:mm a")}</span>
-                  </div>
-                  {meeting.speakerTranscript && (
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-start space-x-4 min-w-0">
+                <span className="text-2xl flex-shrink-0 transform transition-all hover:scale-110">{meeting.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg truncate">{meeting.title}</h3>
+                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      <span>
-                        {new Set(Object.values(meeting.speakerTranscript).map(s => s.speaker)).size} participants
-                      </span>
+                      <Calendar className="h-4 w-4 flex-shrink-0" />
+                      <span>{formatDate(meeting.timestamp, "MMM d, yyyy")}</span>
                     </div>
-                  )}
-                </div>
-                <div className="flex gap-2 mt-3">
-                  {meeting.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary">
-                      {tag}
-                    </Badge>
-                  ))}
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4 flex-shrink-0" />
+                      <span>{formatDate(meeting.timestamp, "h:mm a")}</span>
+                    </div>
+                    {meeting.speakerTranscript && (
+                      <div className="flex items-center gap-1">
+                        <Users className="h-4 w-4 flex-shrink-0" />
+                        <span>
+                          {new Set(Object.values(meeting.speakerTranscript).map(s => s.speaker)).size} participants
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+              <div className="flex gap-2 flex-shrink-0 ml-4">
+                {meeting.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="transform transition-all hover:scale-105">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
             </div>
-          </Card>
+          </div>
         ))}
         {filteredMeetings.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">

@@ -175,22 +175,26 @@ export default function InsightsPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-6">AI Insights</h1>
+    <div className="p-6 max-w-7xl mx-auto">
+      <h1 className="text-2xl font-semibold mb-8">AI Insights</h1>
 
       {insights.length > 0 ? (
-        <div className="space-y-4">
+        <div className="grid gap-4">
           {insights.map((insight) => (
             <Card 
               key={`${insight.automationId}-${insight.id}`} 
-              className="p-4 hover:shadow-sm transition-shadow cursor-pointer"
+              className="p-6 transform transition-all duration-200 hover:bg-accent/50 hover:scale-[1.01] active:scale-[0.99] cursor-pointer w-full"
               onClick={() => setSelectedInsight(insight)}
             >
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-medium">
+                  <h2 className="text-lg">
                     {insight.name || `Insight #${insight.id}`}
                   </h2>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Zap className="h-4 w-4" />
+                    <span>{insight.automationName}</span>
+                  </div>
                 </div>
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {insight.description || 'No description provided'}
@@ -199,19 +203,15 @@ export default function InsightsPage() {
                   <span>{insight.responsesCount}</span>
                   <span>insight{insight.responsesCount !== 1 ? 's' : ''}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Zap className="h-4 w-4" />
-                  <span>{insight.automationName}</span>
-                </div>
               </div>
             </Card>
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 border rounded-lg">
+        <div className="text-center py-12 border rounded-lg transform transition-all hover:border-primary/50">
           <p className="text-muted-foreground">No AI insights found</p>
           <p className="text-sm text-muted-foreground mt-2">
-            Set up an automation with AI insights to get started.
+            Set up an integration with AI insights to get started.
           </p>
         </div>
       )}

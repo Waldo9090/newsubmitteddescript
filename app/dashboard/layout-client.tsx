@@ -99,8 +99,6 @@ export default function DashboardLayout({
   const [aiInput, setAiInput] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  const isSpecialPage = pathname.startsWith('/dashboard/integrations') || pathname.startsWith('/dashboard/settings');
-
   const refreshMeetings = () => {
     setRefreshTrigger((prev: number) => prev + 1);
   };
@@ -233,54 +231,48 @@ export default function DashboardLayout({
             </Sidebar>
 
             <div className="flex flex-col flex-1 overflow-hidden">
-              <header className="border-b border-border bg-background sticky top-0 z-10 w-full">
-                <div className="h-16 px-6 flex items-center">
-                  <div className="flex items-center gap-4 flex-1">
-                    {!isSpecialPage && (
-                      <>
-                        <SidebarTrigger />
-                        <div className="relative w-64">
-                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            type="text"
-                            placeholder="Search or ask a question..."
-                            className="pl-8"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  {!isSpecialPage && (
-                    <div className="flex-none ml-4">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            New meeting
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setIsRecordOpen(true)}>
-                            <Mic className="mr-2 h-4 w-4" />
-                            <span>Record</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setIsImportOpen(true)}>
-                            <Upload className="mr-2 h-4 w-4" />
-                            <span>Import</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setIsInviteOpen(true)}>
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            <span>Invite Descript</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+              <header className="fixed top-0 right-0 left-[240px] h-16 border-b border-border bg-background z-50">
+                <div className="absolute inset-0 flex items-center">
+                  <SidebarTrigger className="absolute left-6" />
+                  <div className="absolute left-[88px] right-[180px]">
+                    <div className="relative w-full">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      <Input
+                        type="text"
+                        placeholder="Search or ask a question..."
+                        className="pl-8 w-full pr-4"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
                     </div>
-                  )}
+                  </div>
+                  <div className="absolute right-6">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          New meeting
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setIsRecordOpen(true)}>
+                          <Mic className="mr-2 h-4 w-4" />
+                          <span>Record</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setIsImportOpen(true)}>
+                          <Upload className="mr-2 h-4 w-4" />
+                          <span>Import</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setIsInviteOpen(true)}>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          <span>Invite Descript</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </header>
-              <main className="flex-1 overflow-auto">
+              <main className="flex-1 overflow-auto pt-16">
                 {children}
               </main>
             </div>

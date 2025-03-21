@@ -37,6 +37,7 @@ export default function Header() {
   const menuItems = [
     { href: "/releases", label: "Releases" },
     { href: "/pricing", label: "Pricing" },
+    { href: "/privacy", label: "Privacy" },
   ]
 
   return (

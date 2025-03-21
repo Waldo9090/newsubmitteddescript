@@ -197,7 +197,7 @@ const renderIcon = (integration: IntegrationIcon | undefined) => {
 
 export default function IntegrationsPage() {
   const [isCreating, setIsCreating] = useState(false)
-  const [automationName, setAutomationName] = useState("Untitled Automation")
+  const [automationName, setAutomationName] = useState("Untitled Integration")
   const [currentStep, setCurrentStep] = useState<StepType>(null)
   const [steps, setSteps] = useState<Step[]>([])
   const [savedAutomations, setSavedAutomations] = useState<SavedAutomation[]>([])
@@ -766,46 +766,76 @@ export default function IntegrationsPage() {
   if (!isCreating) {
     return (
       <DashboardLayout>
-        <div className="p-6 max-w-4xl mx-auto">
-          <h1 className="text-2xl font-semibold mb-6">Automations</h1>
-
-          <div className="bg-secondary/30 rounded-lg p-6 mb-6">
-            <h2 className="text-lg font-medium mb-2">What are automations?</h2>
-            <p className="text-muted-foreground mb-2">Your meetings have a lot of useful information.</p>
-            <p className="text-muted-foreground mb-6">
-              Automations find and take action on the specific details that matter most to you and your team.
-            </p>
-          </div>
+        <div className="p-6 max-w-7xl mx-auto">
+          <h1 className="text-2xl font-semibold mb-6">Integrations</h1>
 
           <div className="space-y-6">
-            <Button onClick={() => {
-              setIsCreating(true)
-              setTriggerStep("initial")
-            }} className="bg-[#6366F1] hover:bg-[#6366F1]/90 text-white">
-              Create automation
-            </Button>
-
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Saved Automations</h3>
-              {savedAutomations.map((automation) => (
-                <Card 
-                  key={automation.id}
-                  className="cursor-pointer hover:bg-accent/50 transition-colors"
-                  onClick={() => router.push(`/dashboard/integrations/${automation.id}`)}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>{automation.name || automation.id}</CardTitle>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </CardHeader>
-                </Card>
-              ))}
+            <div className="bg-muted/40 rounded-lg p-8 space-y-4 transform transition-all hover:bg-muted/50">
+              <h3 className="text-xl font-semibold">Supercharge Your Workflow</h3>
+              <p className="text-muted-foreground">
+                Connect your favorite tools and let DescriptAI do the heavy lifting.
+              </p>
+              <p className="text-muted-foreground">
+                Automatically sync meeting notes to Notion, create tasks in Linear, send updates to Slack, and more - all without lifting a finger.
+              </p>
+              <Button 
+                onClick={() => setIsCreating(true)} 
+                className="mt-4 transform transition-all hover:scale-105 active:scale-95"
+              >
+                Create integration
+              </Button>
             </div>
 
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="mt-8">
+              <h3 className="text-lg font-medium mb-4">Saved Integrations</h3>
+              <div className="grid gap-4">
+                {savedAutomations.map((automation) => (
+                  <Card 
+                    key={automation.id}
+                    className="cursor-pointer transform transition-all duration-200 hover:bg-accent/50 hover:scale-[1.01] active:scale-[0.99]"
+                    onClick={() => router.push(`/dashboard/integrations/${automation.id}`)}
+                  >
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
+                      <div className="flex items-center gap-4">
+                        <CardTitle className="font-normal">{automation.name || automation.id}</CardTitle>
+                        <div className="flex items-center gap-2">
+                          {Object.values(automation.steps).map((step, index) => {
+                            const stepType = step.type;
+                            const integration = integrationIcons[stepType];
+                            if (!integration) return null;
+                            
+                            return (
+                              <div
+                                key={`${automation.id}-${stepType}-${index}`}
+                                className="h-6 w-6 rounded-md bg-background flex items-center justify-center transform transition-all hover:scale-110"
+                                title={integration.name}
+                              >
+                                {integration.iconUrl && (
+                                  <Image
+                                    src={integration.iconUrl}
+                                    alt={integration.name}
+                                    width={16}
+                                    height={16}
+                                    className={`${integration.color} transform transition-all`}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground transform transition-transform group-hover:translate-x-1" />
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 flex-wrap mt-8">
               {Object.entries(integrationIcons).map(([id, integration]) => (
                 <div
                   key={id}
-                  className="h-8 w-8 rounded-lg bg-background flex items-center justify-center"
+                  className="h-10 w-10 rounded-lg bg-background flex items-center justify-center transform transition-all hover:scale-110 hover:shadow-md"
                 >
                   {integration && renderIcon(integration)}
                 </div>
@@ -832,8 +862,7 @@ export default function IntegrationsPage() {
           <div>
             <h3 className="text-lg font-medium mb-4">When to run</h3>
             <p className="text-muted-foreground mb-6">
-              Choose which meetings to run this automation after by adding conditions. By default, this automation
-              will run after every meeting.
+              Select specific meeting tags to trigger this integration. Without any conditions, the integration will process all meetings automatically.
             </p>
 
             <div className="bg-muted/30 p-6 rounded-lg space-y-4">
@@ -895,18 +924,6 @@ export default function IntegrationsPage() {
               </Button>
             </div>
 
-            <Button variant="outline" className="mt-4">
-              Add another condition group
-            </Button>
-
-            <Alert className="mt-6">
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                This automation will run when any of the selected tags are added to a meeting. You can disable automatic
-                meeting tagging in Settings.
-              </AlertDescription>
-            </Alert>
-
             <div className="mt-8">
               <Button onClick={() => {
                 setTriggerStep("actions")
@@ -940,9 +957,9 @@ export default function IntegrationsPage() {
           <div className="space-y-8">
             <button
               onClick={() => setCurrentStep(null)}
-              className="flex items-center text-muted-foreground hover:text-foreground text-lg"
+              className="flex items-center text-muted-foreground hover:text-foreground text-lg transition-colors"
             >
-              <ChevronLeft className="h-5 w-5 mr-2" />
+              <ChevronLeft className="h-5 w-5 mr-2 transform transition-transform group-hover:-translate-x-1" />
               Update Notion
             </button>
             <div className="space-y-6 bg-card p-6 rounded-lg border border-border">
@@ -956,9 +973,9 @@ export default function IntegrationsPage() {
         <div className="space-y-8">
           <button
             onClick={() => setCurrentStep(null)}
-            className="flex items-center text-muted-foreground hover:text-foreground text-lg"
+            className="flex items-center text-muted-foreground hover:text-foreground text-lg transition-colors"
           >
-            <ChevronLeft className="h-5 w-5 mr-2" />
+            <ChevronLeft className="h-5 w-5 mr-2 transform transition-transform group-hover:-translate-x-1" />
             Update Notion
           </button>
           <div className="space-y-6 bg-card p-6 rounded-lg border border-border">
@@ -1340,6 +1357,15 @@ export default function IntegrationsPage() {
       return;
     }
 
+    if (!automationName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide a name for your automation",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setIsSaving(true);
       console.log('Starting automation save process...');
@@ -1428,9 +1454,18 @@ export default function IntegrationsPage() {
 
       console.log('All steps saved successfully');
       toast({
-        title: "Success",
-        description: "Automation saved successfully"
+        title: "Automation Created",
+        description: `"${automationName}" has been saved successfully`
       });
+      
+      // Reset the form state
+      setIsCreating(false);
+      setTriggerStep("initial");
+      setSteps([]);
+      setSelectedTags([]);
+      setAutomationName("");
+      
+      // Navigate back to the main integrations page
       router.push('/dashboard/integrations');
     } catch (error) {
       console.error('Error saving automation:', error);
