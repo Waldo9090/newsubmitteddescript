@@ -1,0 +1,25 @@
+/* 
+  This stylesheet provides utility classes to ensure pages 
+  fill the full horizontal space and elements (like buttons or tabs)
+  are aligned as desired.
+*/
+
+/* The .full-page class ensures the container spans 100% width with some padding */
+.full-page {
+  width: 100%;
+  padding: 1rem;
+  margin: 0 auto;
+}
+
+/* Use .full-width-button on buttons that should be aligned to the very right */
+.full-width-button {
+  margin-left: auto;
+  display: block;
+}
+
+/* Use .full-width-tabs on tab container elements to span the full width */
+.full-width-tabs {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+}
