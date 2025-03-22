@@ -22,6 +22,7 @@ interface ActionItem {
   title: string;
   description: string;
   done: boolean;
+  id: string;
 }
 
 interface TranscriptData {
@@ -29,7 +30,7 @@ interface TranscriptData {
   name: string;
   meetingName: string;
   notes?: string;
-  actionItems: Array<string | ActionItem>;
+  actionItems: ActionItem[];
   transcript: string;
 }
 
@@ -293,9 +294,6 @@ async function processNotionStep(transcriptData: TranscriptData, userEmail: stri
 
       // Add each action item as a to_do block
       transcriptData.actionItems.forEach((item) => {
-        // If item is an object with title/description, use title
-        const itemText = typeof item === 'string' ? item : item.title;
-        
         blocks.push({
           object: 'block',
           type: 'to_do',
@@ -303,12 +301,28 @@ async function processNotionStep(transcriptData: TranscriptData, userEmail: stri
             rich_text: [{ 
               type: 'text', 
               text: { 
-                content: itemText 
+                content: item.title
               } 
             }],
-            checked: false,
+            checked: item.done,
           },
         });
+        
+        // Add description as a paragraph block if it exists
+        if (item.description) {
+          blocks.push({
+            object: 'block',
+            type: 'paragraph',
+            paragraph: {
+              rich_text: [{ 
+                type: 'text', 
+                text: { 
+                  content: item.description 
+                } 
+              }],
+            },
+          });
+        }
       });
     }
 
@@ -466,13 +480,25 @@ export async function processSlackStep(
       );
 
       transcript.actionItems.forEach((item, index) => {
+        // Add title
         blocks.push({
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `${index + 1}. ${item}`
+            text: `${index + 1}. ${item.title} ${item.done ? '✅' : ''}`
           }
         });
+
+        // Add description if it exists
+        if (item.description) {
+          blocks.push({
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `   _${item.description}_`
+            }
+          });
+        }
       });
     }
 
