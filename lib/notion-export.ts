@@ -29,7 +29,7 @@ interface TranscriptData {
   name: string;
   meetingName: string;
   notes?: string;
-  actionItems: string[];
+  actionItems: Array<string | ActionItem>;
   transcript: string;
 }
 
@@ -277,7 +277,8 @@ async function processNotionStep(transcriptData: TranscriptData, userEmail: stri
     // Add action items if enabled
     if (stepData.exportActionItems && transcriptData.actionItems?.length > 0) {
       console.log('[Notion Export] Adding action items to blocks...', {
-        actionItemCount: transcriptData.actionItems.length
+        actionItemCount: transcriptData.actionItems.length,
+        actionItems: transcriptData.actionItems
       });
       
       blocks.push(
@@ -287,23 +288,36 @@ async function processNotionStep(transcriptData: TranscriptData, userEmail: stri
           heading_2: {
             rich_text: [{ type: 'text', text: { content: 'Action Items' } }],
           },
-        },
-        ...transcriptData.actionItems.map((item) => ({
+        }
+      );
+
+      // Add each action item as a to_do block
+      transcriptData.actionItems.forEach((item) => {
+        // If item is an object with title/description, use title
+        const itemText = typeof item === 'string' ? item : item.title;
+        
+        blocks.push({
           object: 'block',
           type: 'to_do',
           to_do: {
-            rich_text: [{ type: 'text', text: { content: item } }],
+            rich_text: [{ 
+              type: 'text', 
+              text: { 
+                content: itemText 
+              } 
+            }],
             checked: false,
           },
-        }))
-      );
+        });
+      });
     }
 
     console.log('[Notion Export] Creating Notion page...', {
       pageId: stepData.pageId,
       blockCount: blocks.length,
       hasNotes: stepData.exportNotes && !!transcriptData.notes,
-      hasActionItems: stepData.exportActionItems && transcriptData.actionItems?.length > 0
+      hasActionItems: stepData.exportActionItems && transcriptData.actionItems?.length > 0,
+      blocks: blocks
     });
 
     // Create a new page in Notion through our API
