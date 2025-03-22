@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { debounce } from 'lodash';
 import { CreateActionItemDialog } from './create-action-item-dialog';
+import { Textarea } from "@/components/ui/textarea";
 
 interface ActionItem {
   id: string;
@@ -39,7 +40,8 @@ interface ActionItem {
 interface SpeakerTranscript {
   speaker: string;
   text: string;
-  timestamp: number;
+  start: number;
+  end: number;
 }
 
 interface MeetingData {
@@ -51,11 +53,13 @@ interface MeetingData {
   emoji: string;
   name: string;
   notes: string;
-  speakerTranscript: { [key: string]: SpeakerTranscript };
+  speakerTranscript: SpeakerTranscript[];
   tags: string[];
   timestamp: number;
+  timestampMs: number;
   transcript: string;
   title: string;
+  type: string;
 }
 
 interface MeetingDetailProps {
@@ -83,6 +87,13 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
   const [attioSyncStatus, setAttioSyncStatus] = useState<'none' | 'success' | 'error' | 'not-connected'>('none');
   const [showAttioConnectDialog, setShowAttioConnectDialog] = useState(false);
   const [showCreateActionItem, setShowCreateActionItem] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedNotes, setEditedNotes] = useState(meeting.notes);
+  const [editedTranscript, setEditedTranscript] = useState(meeting.transcript);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   // Fetch video recording if botId is available
   useEffect(() => {
@@ -199,12 +210,12 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
   };
 
   const formatSpeakerTranscripts = () => {
-    if (!meeting.speakerTranscript) return '';
+    if (!meeting.speakerTranscript || !Array.isArray(meeting.speakerTranscript)) return '';
 
-    const transcripts = Object.values(meeting.speakerTranscript)
-      .sort((a, b) => a.timestamp - b.timestamp)
+    const transcripts = meeting.speakerTranscript
+      .sort((a, b) => a.start - b.start)
       .map(entry => {
-        const time = formatDate(entry.timestamp);
+        const time = formatTranscriptTime(entry.start);
         return `**${time} - ${entry.speaker}:** ${entry.text.trim()}`;
       })
       .join('\n\n');
@@ -239,7 +250,7 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
   };
 
   const uniqueSpeakers = new Set(
-    Object.values(meeting.speakerTranscript).map(t => t.speaker)
+    meeting.speakerTranscript.map(t => t.speaker)
   );
 
   const handleCopyNotes = async () => {
@@ -293,13 +304,9 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
 
     try {
       // Create a new speakerTranscript object with updated names
-      const updatedSpeakerTranscript = Object.entries(meeting.speakerTranscript).reduce((acc, [key, entry]) => {
-        acc[key] = {
-          ...entry,
-          speaker: entry.speaker === oldName ? newName : entry.speaker
-        };
-        return acc;
-      }, {} as { [key: string]: SpeakerTranscript });
+      const updatedSpeakerTranscript = meeting.speakerTranscript.map(entry => 
+        entry.speaker === oldName ? { ...entry, speaker: newName } : entry
+      );
 
       // Update the document in Firestore
       const meetingRef = doc(getFirebaseDb(), 'transcript', user.email, 'timestamps', meeting.id);
@@ -565,6 +572,113 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
         variant: "destructive",
       });
     }
+  };
+
+  // Add logging effect for meeting data
+  useEffect(() => {
+    console.log('=== Meeting Data Debug ===');
+    console.log('Meeting ID:', meeting.id);
+    console.log('Audio URL:', meeting.audioURL);
+    console.log('Speaker Transcript:', meeting.speakerTranscript);
+    console.log('Speaker Transcript Type:', typeof meeting.speakerTranscript);
+    console.log('Audio Element State:', {
+      audioElement: !!audioElement,
+      isPlaying,
+      currentTime,
+      duration
+    });
+    
+    if (meeting.speakerTranscript) {
+      console.log('Speaker Transcript Array Check:', Array.isArray(meeting.speakerTranscript));
+      console.log('Speaker Transcript Length:', meeting.speakerTranscript.length);
+      if (meeting.speakerTranscript.length > 0) {
+        console.log('First Entry Sample:', meeting.speakerTranscript[0]);
+      }
+    }
+  }, [meeting, audioElement, isPlaying, currentTime, duration]);
+
+  // Add logging for audio initialization
+  useEffect(() => {
+    console.log('=== Audio Player Initialization ===');
+    console.log('Audio URL:', meeting.audioURL);
+    
+    if (meeting.audioURL) {
+      const audio = new Audio(meeting.audioURL);
+      
+      audio.addEventListener('loadedmetadata', () => {
+        console.log('Audio metadata loaded:', {
+          duration: audio.duration,
+          readyState: audio.readyState
+        });
+        setDuration(audio.duration);
+      });
+
+      audio.addEventListener('error', (e) => {
+        console.error('Audio loading error:', {
+          error: e,
+          audioError: audio.error,
+          audioURL: meeting.audioURL
+        });
+      });
+
+      audio.addEventListener('timeupdate', () => {
+        setCurrentTime(audio.currentTime);
+      });
+
+      audio.addEventListener('play', () => {
+        console.log('Audio playback started');
+        setIsPlaying(true);
+      });
+
+      audio.addEventListener('pause', () => {
+        console.log('Audio playback paused');
+        setIsPlaying(false);
+      });
+
+      setAudioElement(audio);
+
+      return () => {
+        console.log('Cleaning up audio element');
+        audio.pause();
+        audio.remove();
+      };
+    } else {
+      console.warn('No audio URL provided for meeting:', meeting.id);
+    }
+  }, [meeting.audioURL, meeting.id]);
+
+  // Format time for audio player
+  const formatTime = (time: number) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Handle audio playback
+  const togglePlayPause = () => {
+    if (audioElement) {
+      if (isPlaying) {
+        audioElement.pause();
+      } else {
+        audioElement.play();
+      }
+    }
+  };
+
+  // Handle seeking
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (audioElement) {
+      const time = parseFloat(e.target.value);
+      audioElement.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
+  // Format time for transcript display
+  const formatTranscriptTime = (time: number) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -849,249 +963,103 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
 
             {/* Main Content - Fill remaining height */}
             <div className="flex-1 overflow-hidden">
-              <Tabs defaultValue="notes" className="h-full flex flex-col">
-                <TabsList className="flex-none w-full p-0 bg-transparent border-b">
-                  <TabsTrigger value="notes" className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent">Notes</TabsTrigger>
-                  <TabsTrigger value="transcript" className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent">Transcript</TabsTrigger>
+              <Tabs defaultValue="playback" className="h-full flex flex-col">
+                <TabsList className="mx-6 mt-2">
+                  <TabsTrigger value="playback">Playback</TabsTrigger>
+                  <TabsTrigger value="summaries">Summaries</TabsTrigger>
                 </TabsList>
 
-                <div className="flex-1 overflow-hidden">
-                  <TabsContent 
-                    value="notes" 
-                    className="h-full overflow-y-auto p-6"
-                    style={{ display: 'block' }}
-                  >
-                    <div className="space-y-8">
-                      <div className="p-6 border rounded-lg bg-card">
-                        {meeting.actionItems && meeting.actionItems.length > 0 && (
-                          <div className="mb-6 p-4 bg-muted/30 rounded-lg text-sm">
-                            <p className="text-muted-foreground">
-                              <strong>Note:</strong> Action items for this meeting are available in the dedicated Action Items tab in the dashboard.
-                            </p>
+                <TabsContent value="playback" className="flex-1 overflow-y-auto p-6">
+                  <div className="space-y-8">
+                    {/* Audio Player Section */}
+                    {meeting.audioURL && (
+                      <div className="p-4 bg-card rounded-lg border">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={togglePlayPause}
+                              className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90"
+                            >
+                              {isPlaying ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                                  <rect x="6" y="4" width="4" height="16"/>
+                                  <rect x="14" y="4" width="4" height="16"/>
+                                </svg>
+                              ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 ml-0.5">
+                                  <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                              )}
+                            </button>
+                            <div className="flex-1">
+                              <input
+                                type="range"
+                                min="0"
+                                max={duration || 0}
+                                value={currentTime || 0}
+                                onChange={handleSeek}
+                                className="w-full"
+                              />
+                            </div>
+                            <div className="text-sm tabular-nums">
+                              {formatTime(currentTime || 0)} / {formatTime(duration || 0)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Transcript Section */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Transcript</h3>
+                      <div className="space-y-4">
+                        {meeting.speakerTranscript && meeting.speakerTranscript.length > 0 ? (
+                          meeting.speakerTranscript
+                            .sort((a, b) => (a.start || 0) - (b.start || 0))
+                            .map((entry, index) => (
+                              <div key={`${entry.speaker}-${entry.start}-${index}`} className="p-4 rounded-lg border bg-card hover:bg-accent/50">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="font-medium">{entry.speaker}</span>
+                                      <span className="text-sm text-muted-foreground">
+                                        {formatTranscriptTime(entry.start)}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm">{entry.text}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                        ) : (
+                          <div className="text-center py-4 text-muted-foreground">
+                            No transcript available
                           </div>
                         )}
-                        <EditableContent 
-                          content={meeting.notes} 
-                          onSave={handleUpdateNotes}
-                          placeholder="No notes available for this meeting. Click the edit button to add notes."
-                        />
                       </div>
                     </div>
-                  </TabsContent>
+                  </div>
+                </TabsContent>
 
-                  <TabsContent 
-                    value="transcript" 
-                    className="h-full overflow-y-auto p-6"
-                    style={{ display: 'block' }}
-                  >
-                    <div className="space-y-6">
-                      {/* Audio Player Section */}
-                      <div className="bg-card rounded-lg p-5 border">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="bg-primary/10 p-2 rounded-full">
-                            <Volume2 className="h-5 w-5 text-primary" />
-                          </div>
-                          <h3 className="text-lg font-medium">Audio Recording</h3>
-                        </div>
-                        <ReactAudioPlayer
-                          src={meeting.audioURL}
-                          controls
-                          className="w-full"
-                          onLoadedMetadata={(e) => {
-                            const audioElement = e.target as HTMLAudioElement;
-                            if (audioElement) {
-                              setAudioDuration(audioElement.duration);
-                            }
-                          }}
-                        />
+                <TabsContent value="summaries" className="flex-1 overflow-y-auto p-6">
+                  <div className="space-y-8">
+                    {/* Notes Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">Notes</h3>
+                        <Button variant="outline" size="sm" onClick={handleCopyNotes}>
+                          Copy Notes
+                        </Button>
                       </div>
-
-                      {/* Transcript Section */}
-                      <div className="bg-card rounded-lg border overflow-hidden">
-                        <div className="p-5 border-b bg-muted/10">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-primary/10 p-2 rounded-full">
-                              <FileText className="h-5 w-5 text-primary" />
-                            </div>
-                            <h3 className="text-lg font-medium">Transcript</h3>
-                          </div>
-                        </div>
-                        
-                        <div className="divide-y">
-                          {(() => {
-                            // Check if speakerTranscript is an array
-                            if (Array.isArray(meeting.speakerTranscript) && meeting.speakerTranscript.length > 0) {
-                              return meeting.speakerTranscript.map((entry, index) => (
-                                <div key={index} className="p-4 hover:bg-accent/5 transition-colors">
-                                  <div className="flex gap-4">
-                                    <div className="w-48 flex-shrink-0">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                          <User className="h-4 w-4 text-primary" />
-                                        </div>
-                                        {editingSpeaker === entry.speaker ? (
-                                          <div className="flex flex-col gap-2">
-                                            <Input
-                                              value={newSpeakerName}
-                                              onChange={(e) => setNewSpeakerName(e.target.value)}
-                                              className="h-7 w-32"
-                                              placeholder="New name"
-                                            />
-                                            <div className="flex gap-2">
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                  handleUpdateSpeakerName(entry.speaker, newSpeakerName);
-                                                }}
-                                              >
-                                                Save
-                                              </Button>
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                  setEditingSpeaker(null);
-                                                  setNewSpeakerName("");
-                                                }}
-                                              >
-                                                Cancel
-                                              </Button>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <div className="flex items-center gap-2">
-                                            <span className="font-medium">{entry.speaker}</span>
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-6 w-6 p-0"
-                                              onClick={() => {
-                                                setEditingSpeaker(entry.speaker);
-                                                setNewSpeakerName(entry.speaker);
-                                              }}
-                                            >
-                                              <Pencil className="h-3.5 w-3.5" />
-                                            </Button>
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground mt-2 ml-10">
-                                        {formatDate(entry.timestamp)}
-                                      </div>
-                                    </div>
-                                    <div className="flex-1 text-muted-foreground pt-1">
-                                      {entry.text}
-                                    </div>
-                                  </div>
-                                </div>
-                              ));
-                            }
-                            // Check if speakerTranscript is an object with entries
-                            else if (typeof meeting.speakerTranscript === 'object' && 
-                                    Object.keys(meeting.speakerTranscript).length > 0) {
-                              return Object.entries(meeting.speakerTranscript).map(([key, entry]) => (
-                                <div key={key} className="p-4 hover:bg-accent/5 transition-colors">
-                                  <div className="flex gap-4">
-                                    <div className="w-48 flex-shrink-0">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                          <User className="h-4 w-4 text-primary" />
-                                        </div>
-                                        {editingSpeaker === entry.speaker ? (
-                                          <div className="flex flex-col gap-2">
-                                            <Input
-                                              value={newSpeakerName}
-                                              onChange={(e) => setNewSpeakerName(e.target.value)}
-                                              className="h-7 w-32"
-                                              placeholder="New name"
-                                            />
-                                            <div className="flex gap-2">
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                  handleUpdateSpeakerName(entry.speaker, newSpeakerName);
-                                                }}
-                                              >
-                                                Save
-                                              </Button>
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                  setEditingSpeaker(null);
-                                                  setNewSpeakerName("");
-                                                }}
-                                              >
-                                                Cancel
-                                              </Button>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <div className="flex items-center gap-2">
-                                            <span className="font-medium">{entry.speaker}</span>
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-6 w-6 p-0"
-                                              onClick={() => {
-                                                setEditingSpeaker(entry.speaker);
-                                                setNewSpeakerName(entry.speaker);
-                                              }}
-                                            >
-                                              <Pencil className="h-3.5 w-3.5" />
-                                            </Button>
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground mt-2 ml-10">
-                                        {formatDate(entry.timestamp)}
-                                      </div>
-                                    </div>
-                                    <div className="flex-1 text-muted-foreground pt-1">
-                                      {entry.text}
-                                    </div>
-                                  </div>
-                                </div>
-                              ));
-                            } 
-                            // If there's a plain transcript but no speaker transcript
-                            else if (meeting.transcript) {
-                              return (
-                                <div className="p-6">
-                                  <EditableContent 
-                                    content={meeting.transcript} 
-                                    onSave={handleUpdateTranscript}
-                                    placeholder="No transcript available for this meeting. Click the edit button to add a transcript."
-                                  />
-                                </div>
-                              );
-                            }
-                            // No transcript available
-                            else {
-                              return (
-                                <div className="p-6 text-center text-muted-foreground">
-                                  <FileX className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
-                                  <p>No transcript available for this meeting.</p>
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="mt-4"
-                                    onClick={() => handleUpdateTranscript("")}
-                                  >
-                                    <Pencil className="h-4 w-4 mr-1" />
-                                    Add Transcript
-                                  </Button>
-                                </div>
-                              );
-                            }
-                          })()}
-                        </div>
-                      </div>
+                      <Textarea
+                        value={meeting.notes || ''}
+                        onChange={(e) => handleUpdateNotes(e.target.value)}
+                        className="min-h-[200px]"
+                        placeholder="No notes available"
+                      />
                     </div>
-                  </TabsContent>
-                </div>
+                  </div>
+                </TabsContent>
               </Tabs>
             </div>
           </div>

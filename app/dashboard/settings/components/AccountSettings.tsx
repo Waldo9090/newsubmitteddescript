@@ -9,68 +9,51 @@ import { Camera } from "lucide-react"
 import SlackConnection from "../../integrations/components/SlackConnection"
 import NotionConnection from "../../integrations/components/NotionConnection"
 import LinearConnection from "../../integrations/components/LinearConnection"
+import HubSpotConnection from "../../integrations/components/HubSpotConnection"
+import SalesforceConnection from "../../integrations/components/SalesforceConnection"
 import { useAuth } from "@/context/auth-context"
 import { useState } from "react"
 
 export default function AccountSettings() {
   const { user } = useAuth();
-  const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
-  
-  const handleIntegrationCancel = () => {
-    setSelectedIntegration(null);
-  };
-  
-  const handleIntegrationSave = async (config: any) => {
-    // This function is required by the integration components but 
-    // not needed for the account settings page as individual integrations handle their own saving
-    setSelectedIntegration(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSlackSave = async (config: any) => {
+    // This is handled internally by the SlackConnection component
     return Promise.resolve();
+  };
+
+  const handleSlackCancel = () => {
+    // This is handled internally by the SlackConnection component
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Account Settings</h2>
-        <p className="text-muted-foreground mb-6">Manage your account information and preferences.</p>
-      </div>
-
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center mb-6">
+      <Card>
+        <div className="p-6 flex items-start gap-4">
           <div className="relative">
             <Avatar className="h-20 w-20">
-              <AvatarImage src="/placeholder.svg?height=80&width=80" alt="Profile" />
-              <AvatarFallback>JD</AvatarFallback>
+              <AvatarImage src={user?.photoURL || ""} />
+              <AvatarFallback>{user?.email?.[0].toUpperCase()}</AvatarFallback>
             </Avatar>
-            <Button variant="outline" size="icon" className="absolute bottom-0 right-0 rounded-full h-8 w-8">
+            <Button
+              size="icon"
+              variant="outline"
+              className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full"
+            >
               <Camera className="h-4 w-4" />
             </Button>
           </div>
-          <div>
-            <h3 className="text-lg font-medium">{user?.displayName || "User"}</h3>
-            <p className="text-sm text-muted-foreground">{user?.email || "user@example.com"}</p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="first-name">First name</Label>
-              <Input id="first-name" defaultValue={user?.displayName?.split(' ')[0] || "John"} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="last-name">Last name</Label>
-              <Input id="last-name" defaultValue={user?.displayName?.split(' ')[1] || "Doe"} />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email address</Label>
-            <Input id="email" type="email" defaultValue={user?.email || "john@example.com"} disabled />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="company">Company</Label>
-            <Input id="company" defaultValue="Acme Inc." />
+          <div className="flex-1 space-y-1">
+            <Label htmlFor="name">Display Name</Label>
+            <Input
+              id="name"
+              defaultValue={user?.displayName || ""}
+              className="max-w-[400px]"
+            />
+            <p className="text-sm text-muted-foreground">
+              This is the name that will be displayed on your profile and in emails.
+            </p>
           </div>
         </div>
       </Card>
@@ -80,17 +63,11 @@ export default function AccountSettings() {
         <p className="text-muted-foreground mb-6">Connect your accounts to external services.</p>
         
         <div className="space-y-4">
-          <NotionConnection 
-            onSave={handleIntegrationSave}
-            onCancel={handleIntegrationCancel}
-          />
-          
-          <SlackConnection 
-            onSave={handleIntegrationSave}
-            onCancel={handleIntegrationCancel}
-          />
-          
+          <NotionConnection />
+          <SlackConnection onSave={handleSlackSave} onCancel={handleSlackCancel} />
           <LinearConnection />
+          <HubSpotConnection />
+          <SalesforceConnection />
         </div>
       </div>
     </div>

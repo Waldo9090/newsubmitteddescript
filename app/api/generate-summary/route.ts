@@ -1,146 +1,222 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-export interface ActionItem {
-  text: string;
-  assignee?: string;
-  dueDate?: string;
+interface ActionItem {
+  title: string;
+  description: string;
+  status: 'Incomplete';
+}
+
+interface MeetingSummary {
+  name: string;
+  emoji: string;
+  notes: string;
+  actionItems: ActionItem[];
+  type: 'recording';
+}
+
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error('OPENAI_API_KEY environment variable is not set');
 }
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-const extractActionItems = async (transcript: string): Promise<ActionItem[]> => {
+const generateTitle = async (transcript: string): Promise<string> => {
   try {
+    console.log('Generating title for transcript of length:', transcript.length);
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: `You are an AI assistant that extracts action items from meeting transcripts. Your task is to identify tasks, assignments, and deadlines mentioned in the transcript. You must respond with ONLY a JSON array of action items, with no additional text or explanation.`
+          content: "You are a helpful assistant that creates concise, descriptive titles (3-5 words) for meeting transcripts."
         },
         {
           role: "user",
-          content: `Extract all action items from the following meeting transcript. For each action item, provide:
-1. The text of the action item (what needs to be done)
-2. The assignee (who is responsible), if mentioned
-3. The due date, if mentioned (in YYYY-MM-DD format)
+          content: `Create a short, descriptive title (3-5 words) for this meeting transcript:\n${transcript}`
+        }
+      ],
+      model: "gpt-3.5-turbo",
+    });
 
-If no assignee is mentioned, leave it blank. If no due date is mentioned, leave it blank.
-Format your response as a JSON array of objects with the following structure:
-[
-  {
-    "text": "Task description",
-    "assignee": "Person name or blank",
-    "dueDate": "YYYY-MM-DD or blank"
+    const title = completion.choices[0]?.message?.content?.trim() || "Untitled Meeting";
+    console.log('Generated title:', title);
+    return title;
+  } catch (error) {
+    console.error('Error generating title:', error);
+    return "Untitled Meeting";
   }
-]
+};
+
+const generateEmoji = async (transcript: string): Promise<string> => {
+  try {
+    console.log('Generating emoji for transcript');
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that selects a single, relevant emoji that best represents a meeting's content. Respond with only the emoji, nothing else."
+        },
+        {
+          role: "user",
+          content: `Select a single emoji that best represents this meeting transcript:\n${transcript}`
+        }
+      ],
+      model: "gpt-3.5-turbo",
+    });
+
+    const emoji = completion.choices[0]?.message?.content?.trim() || "📝";
+    console.log('Generated emoji:', emoji);
+    return emoji;
+  } catch (error) {
+    console.error('Error generating emoji:', error);
+    return "📝";
+  }
+};
+
+const generateNotes = async (transcript: string): Promise<string> => {
+  try {
+    console.log('Generating notes for transcript');
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that creates structured notes from meeting transcripts. Create clear, organized notes with main points and key takeaways."
+        },
+        {
+          role: "user",
+          content: `Create structured notes from this meeting transcript. Include:
+1. Key discussion points
+2. Important decisions
+3. Notable quotes or statements
+4. Main conclusions
+
+Format in markdown with clear sections.
 
 Transcript:
 ${transcript}`
         }
       ],
-      temperature: 0.5,
-      max_tokens: 1000
+      model: "gpt-3.5-turbo",
+      max_tokens: 1500,
+      temperature: 0.7,
     });
 
-    const response = completion.choices[0]?.message?.content;
-    if (!response) {
-      throw new Error('No response from OpenAI');
-    }
-
-    try {
-      const parsedResponse = JSON.parse(response);
-      return Array.isArray(parsedResponse) ? parsedResponse : [];
-    } catch (error) {
-      console.error('Error parsing action items:', error);
-      return [];
-    }
+    const notes = completion.choices[0]?.message?.content?.trim() || "No notes generated";
+    console.log('Generated notes length:', notes.length);
+    return notes;
   } catch (error) {
-    console.error('Error extracting action items:', error);
+    console.error('Error generating notes:', error);
+    return "Error generating meeting notes";
+  }
+};
+
+const generateActionItems = async (transcript: string): Promise<ActionItem[]> => {
+  try {
+    console.log('Generating action items for transcript');
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that extracts action items from meeting transcripts. Respond with ONLY a JSON array, no markdown formatting or explanation."
+        },
+        {
+          role: "user",
+          content: `Extract action items from this meeting transcript and return them as a JSON array. Each item should have:
+- title: Clear, concise title of what needs to be done
+- description: Detailed description with context
+- status: Always set to 'Incomplete'
+
+Respond with ONLY the JSON array, no other text.
+
+Transcript:
+${transcript}`
+        }
+      ],
+      model: "gpt-3.5-turbo",
+    });
+
+    let content = completion.choices[0]?.message?.content?.trim() || '[]';
+    
+    // Remove any markdown code block formatting if present
+    if (content.startsWith('```')) {
+      content = content.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
+    
+    // Parse the JSON content
+    const actionItems = JSON.parse(content) as Partial<ActionItem>[];
+    console.log('Generated action items count:', actionItems.length);
+    
+    // Validate and ensure each item has required fields
+    return actionItems.map(item => ({
+      title: item.title || 'Untitled Action Item',
+      description: item.description || 'No description provided',
+      status: 'Incomplete'
+    }));
+  } catch (error) {
+    console.error('Error generating action items:', error);
     return [];
   }
 };
 
 export async function POST(request: Request) {
   try {
-    const { transcript, speakerTranscript, meetingId, userId } = await request.json();
+    console.log('=== Starting Meeting Summary Generation ===');
+    
+    const { transcript } = await request.json();
+    console.log('Received transcript length:', transcript?.length || 0);
 
-    if (!transcript || !meetingId || !userId) {
-      return NextResponse.json({ 
-        error: 'Missing required parameters',
-        details: {
-          transcript: !transcript,
-          meetingId: !meetingId,
-          userId: !userId
-        }
-      }, { status: 400 });
+    if (!transcript) {
+      throw new Error('No transcript provided');
     }
 
-    // Generate summary using GPT-4
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: `You are an AI assistant that summarizes meeting transcripts. Create a concise summary that includes:
-          1. Key points discussed
-          2. Action items (in a clear list format)
-          3. Important decisions made
-          Format the response in markdown with clear sections.`
-        },
-        {
-          role: "user",
-          content: transcript
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000
-    });
+    // Validate transcript
+    if (typeof transcript !== 'string' || transcript.trim().length === 0) {
+      throw new Error('Invalid transcript format or empty transcript');
+    }
 
-    const summary = completion.choices[0].message.content;
-
-    // Extract action items using a separate prompt
-    const actionItemsCompletion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: `Extract action items from the meeting transcript. For each action item:
-          1. Identify the task
-          2. Who it's assigned to (if mentioned)
-          3. Due date (if mentioned)
-          Return as a JSON array of objects with properties: text, assignee (optional), dueDate (optional)`
-        },
-        {
-          role: "user",
-          content: transcript
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000
-    });
-
-    let actionItems = [];
+    console.log('Starting parallel API calls for summary generation');
     try {
-      actionItems = JSON.parse(actionItemsCompletion.choices[0].message.content);
-    } catch (error) {
-      console.error('Error parsing action items:', error);
-      actionItems = [];
-    }
+      // Make parallel API calls for better performance
+      const [name, emoji, notes, actionItems] = await Promise.all([
+        generateTitle(transcript),
+        generateEmoji(transcript),
+        generateNotes(transcript),
+        generateActionItems(transcript)
+      ]);
 
-    return NextResponse.json({
-      summary,
-      actionItems,
-      meetingId,
-      userId
-    });
-  } catch (error: any) {
-    console.error('Error generating summary:', error);
-    return NextResponse.json({ 
-      error: 'Failed to generate summary',
-      details: error.message
-    }, { status: 500 });
+      const result: MeetingSummary = {
+        name,
+        emoji,
+        notes,
+        actionItems,
+        type: 'recording'
+      };
+
+      console.log('=== Summary Generation Complete ===');
+      console.log('Generated summary:', {
+        name,
+        emoji,
+        notesLength: notes.length,
+        actionItemsCount: actionItems.length
+      });
+
+      return NextResponse.json(result);
+    } catch (error: any) {
+      console.error('OpenAI API Error:', error);
+      throw new Error(`OpenAI API Error: ${error?.message || 'Unknown OpenAI error'}`);
+    }
+  } catch (error) {
+    console.error('Error in generateMeetingSummary:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const fallback: MeetingSummary = {
+      name: "Untitled Meeting",
+      emoji: "📝",
+      notes: `Error generating meeting notes: ${errorMessage}`,
+      actionItems: [],
+      type: 'recording'
+    };
+    return NextResponse.json(fallback, { status: 500 });
   }
 }

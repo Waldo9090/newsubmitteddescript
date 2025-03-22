@@ -3,14 +3,10 @@ import { Client } from '@notionhq/client';
 
 export async function POST(request: Request) {
   try {
-    const { accessToken, pageId, title, blocks } = await request.json();
+    const { accessToken } = await request.json();
 
     if (!accessToken) {
       return NextResponse.json({ error: 'No access token provided' }, { status: 401 });
-    }
-
-    if (!pageId) {
-      return NextResponse.json({ error: 'No page ID provided' }, { status: 400 });
     }
 
     // Initialize Notion client
@@ -18,31 +14,21 @@ export async function POST(request: Request) {
       auth: accessToken,
     });
 
-    // Create the page in Notion
-    const response = await notion.pages.create({
-      parent: {
-        page_id: pageId,
-      },
-      properties: {
-        title: {
-          title: [
-            {
-              text: {
-                content: title,
-              },
-            },
-          ],
-        },
-      },
-      children: blocks,
-    });
+    // Test the token by making a simple API call
+    const user = await notion.users.me({});
 
-    return NextResponse.json({ success: true, pageId: response.id });
+    return NextResponse.json({ 
+      success: true,
+      user: {
+        name: user.name,
+        type: user.type
+      }
+    });
   } catch (error: any) {
-    console.error('[Notion Create Page] Error:', error);
+    console.error('[Notion Verify Token] Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create Notion page' },
-      { status: 500 }
+      { error: error.message || 'Invalid token' },
+      { status: 401 }
     );
   }
 }

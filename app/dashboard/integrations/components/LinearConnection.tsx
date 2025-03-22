@@ -6,11 +6,20 @@ import { getFirebaseDb } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { integrationIcons } from "@/app/lib/integration-icons";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface LinearTeam {
+  id: string;
+  name: string;
+  key: string;
+}
 
 interface LinearWorkspace {
-  organizationId: string;
-  organizationName: string;
-  issuesEnabled?: boolean;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  teams: LinearTeam[];
+  selectedTeamId: string;
 }
 
 export default function LinearConnection() {
@@ -36,9 +45,11 @@ export default function LinearConnection() {
       if (linearIntegration?.accessToken) {
         setIsConnected(true);
         setWorkspace({
-          organizationId: linearIntegration.organizationId,
-          organizationName: linearIntegration.organizationName,
-          issuesEnabled: linearIntegration.issuesEnabled
+          userId: linearIntegration.userId,
+          userName: linearIntegration.userName,
+          userEmail: linearIntegration.userEmail,
+          teams: linearIntegration.teams || [],
+          selectedTeamId: linearIntegration.selectedTeamId
         });
       }
     } catch (error) {
@@ -81,6 +92,30 @@ export default function LinearConnection() {
     }
   };
 
+  const handleTeamSelect = async (teamId: string) => {
+    if (!user?.email) return;
+
+    try {
+      const db = getFirebaseDb();
+      await setDoc(doc(db, 'users', user.email), {
+        linearIntegration: {
+          ...workspace,
+          selectedTeamId: teamId
+        }
+      }, { merge: true });
+      
+      setWorkspace(prev => prev ? {
+        ...prev,
+        selectedTeamId: teamId
+      } : null);
+      
+      toast.success('Team selection updated successfully');
+    } catch (error) {
+      console.error('Error updating team selection:', error);
+      toast.error('Failed to update team selection');
+    }
+  };
+
   const handleDisconnect = async () => {
     if (!user?.email) return;
 
@@ -118,25 +153,53 @@ export default function LinearConnection() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center">
-              {integrationIcons.linear.icon}
+        <div className="flex flex-col space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center">
+                {integrationIcons.linear.icon}
+              </div>
+              <div>
+                <h4 className="text-sm font-medium">Linear</h4>
+                <p className="text-sm text-muted-foreground">
+                  {isConnected ? `Connected as ${workspace?.userName}` : "Not connected"}
+                </p>
+              </div>
             </div>
-            <div>
-              <h4 className="text-sm font-medium">Linear</h4>
-              <p className="text-sm text-muted-foreground">
-                {isConnected ? `Connected to ${workspace?.organizationName}` : "Not connected"}
-              </p>
-            </div>
+            <Button
+              onClick={isConnected ? handleDisconnect : handleConnect}
+              variant={isConnected ? "outline" : "default"}
+              disabled={isConnecting}
+            >
+              {isConnecting ? "Connecting..." : isConnected ? "Disconnect" : "Connect"}
+            </Button>
           </div>
-          <Button
-            onClick={isConnected ? handleDisconnect : handleConnect}
-            variant={isConnected ? "outline" : "default"}
-            disabled={isConnecting}
-          >
-            {isConnecting ? "Connecting..." : isConnected ? "Disconnect" : "Connect"}
-          </Button>
+
+          {isConnected && workspace && (
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-medium mb-2">Select Team</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Choose which team to create issues in
+                </p>
+                <Select 
+                  value={workspace.selectedTeamId} 
+                  onValueChange={handleTeamSelect}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workspace.teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

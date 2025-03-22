@@ -278,187 +278,209 @@ export default function RecordDialog({ open, onOpenChange }: RecordDialogProps) 
           throw new Error('Empty transcript received');
         }
         
-        console.log('Sending transcript for summary generation:', fullTranscript);
-        
-        summaryResponse = await fetch('/api/generate-summary', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            transcript: fullTranscript,
-            meetingId: Date.now().toString(),
-            userId: user.email
-          })
-        });
+        console.log('=== Generating Meeting Summary ===');
+        console.log('Transcript length:', fullTranscript.length);
 
-        if (!summaryResponse.ok) {
-          const summaryResponseText = await summaryResponse.text();
-          console.error('Summary response:', summaryResponseText);
-          throw new Error(`Summary generation failed with status ${summaryResponse.status}: ${summaryResponseText}`);
-        }
-
-        const summaryData = await summaryResponse.json();
-        console.log('Generated summary data:', summaryData);
-        const { 
-          emoji: meetingEmoji, 
-          name: meetingName, 
-          notes: meetingNotes, 
-          actionItems: generatedActionItems 
-        } = summaryData;
-
-        // Extract action items from transcript
-        setProcessingStatus('Extracting action items...');
-        const actionItemsResponse = await fetch('/api/extract-action-items', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            transcript: fullTranscript
-          })
-        });
-
-        let extractedActionItems = [];
-        if (actionItemsResponse.ok) {
-          const actionItemsData = await actionItemsResponse.json();
-          console.log('Extracted action items:', actionItemsData);
-          extractedActionItems = actionItemsData.actionItems || [];
-        } else {
-          console.error('Failed to extract action items:', await actionItemsResponse.text());
-        }
-
-        // Combine action items from both sources
-        const allActionItems = [...(generatedActionItems || []), ...extractedActionItems];
-
-        // Save to Firestore with user email as document ID
-        const timestamp = Date.now();
-        const uniqueId = `${timestamp}-${Math.random().toString(36).substring(2, 15)}`;
-        
-        // Create document with email-based path in timestamps subcollection
-        const batch = writeBatch(db);
-        
-        // Add document to Firestore with only specified fields
-        const meetingRef = doc(db, 'transcript', user.email, 'timestamps', uniqueId);
-        
-        console.log('=== Saving Meeting Document ===');
-        console.log('Creating document with path:', `transcript/${user.email}/timestamps/${uniqueId}`);
-        console.log('Using meetingRef:', meetingRef.path);
-        
-        const meetingData = {
-          audioURL,
-          emoji: meetingEmoji || '📝',
-          id: uniqueId,
-          name: meetingName || 'New Meeting',
-          notes: meetingNotes || '',
-          speakerTranscript: speakerTranscriptData,
-          tags: ['meeting'],
-          timestamp: serverTimestamp(),
-          timestampMs: Date.now(),
-          title: meetingName || 'New Meeting',
-          transcript: transcriptText,
-          type: 'recording',
-          actionItems: extractedActionItems.map((item: ActionItem) => ({
-            id: `${uniqueId}-${Math.random().toString(36).substring(2, 15)}`,
-            title: item.title,
-            description: item.description,
-            done: false
-          }))
-        };
-        console.log('Meeting Document:', meetingData);
-        
         try {
-          await batch.set(meetingRef, meetingData);
-          console.log('Meeting document added to batch successfully');
-        } catch (error) {
-          console.error('Error adding meeting document to batch:', error);
-          throw error;
-        }
+          summaryResponse = await fetch('/api/generate-summary', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              transcript: fullTranscript
+            })
+          });
 
-        // Save action items to Firestore
-        if (allActionItems.length > 0) {
-          setProcessingStatus('Saving action items...');
-          console.log('=== Processing Action Items ===');
-          console.log(`Found ${allActionItems.length} action items to process`);
+          if (!summaryResponse.ok) {
+            const summaryResponseText = await summaryResponse.text();
+            console.error('Summary generation failed:', {
+              status: summaryResponse.status,
+              response: summaryResponseText
+            });
+            throw new Error(`Summary generation failed with status ${summaryResponse.status}: ${summaryResponseText}`);
+          }
+
+          const summaryData = await summaryResponse.json();
+          console.log('Summary generation successful:', {
+            hasName: !!summaryData.name,
+            hasEmoji: !!summaryData.emoji,
+            notesLength: summaryData.notes?.length || 0,
+            actionItemsCount: summaryData.actionItems?.length || 0
+          });
+
+          const { 
+            emoji: meetingEmoji, 
+            name: meetingName, 
+            notes: meetingNotes, 
+            actionItems: generatedActionItems 
+          } = summaryData;
+
+          if (!meetingName || !meetingEmoji || !meetingNotes) {
+            console.error('Missing required fields in summary response:', {
+              hasName: !!meetingName,
+              hasEmoji: !!meetingEmoji,
+              hasNotes: !!meetingNotes
+            });
+          }
+
+          // Extract action items from transcript
+          setProcessingStatus('Extracting action items...');
+          const actionItemsResponse = await fetch('/api/extract-action-items', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              transcript: fullTranscript
+            })
+          });
+
+          let extractedActionItems = [];
+          if (actionItemsResponse.ok) {
+            const actionItemsData = await actionItemsResponse.json();
+            console.log('Extracted action items:', actionItemsData);
+            extractedActionItems = actionItemsData.actionItems || [];
+          } else {
+            console.error('Failed to extract action items:', await actionItemsResponse.text());
+          }
+
+          // Combine action items from both sources
+          const allActionItems = [...(generatedActionItems || []), ...extractedActionItems];
+
+          // Save to Firestore with user email as document ID
+          const timestamp = Date.now();
+          const uniqueId = `${timestamp}-${Math.random().toString(36).substring(2, 15)}`;
           
-          // First commit the main meeting document batch to reduce transaction size
+          // Create document with email-based path in timestamps subcollection
+          const batch = writeBatch(db);
+          
+          // Add document to Firestore with only specified fields
+          const meetingRef = doc(db, 'transcript', user.email, 'timestamps', uniqueId);
+          
+          console.log('=== Saving Meeting Document ===');
+          console.log('Creating document with path:', `transcript/${user.email}/timestamps/${uniqueId}`);
+          console.log('Using meetingRef:', meetingRef.path);
+          
+          const meetingData = {
+            audioURL,
+            emoji: meetingEmoji || '📝',
+            id: uniqueId,
+            name: meetingName || 'New Meeting',
+            notes: meetingNotes || '',
+            speakerTranscript: speakerTranscriptData,
+            tags: ['meeting'],
+            timestamp: serverTimestamp(),
+            timestampMs: Date.now(),
+            title: meetingName || 'New Meeting',
+            transcript: transcriptText,
+            type: 'recording',
+            actionItems: extractedActionItems.map((item: ActionItem) => ({
+              id: `${uniqueId}-${Math.random().toString(36).substring(2, 15)}`,
+              title: item.title,
+              description: item.description,
+              done: false
+            }))
+          };
+          console.log('Meeting Document:', meetingData);
+          
           try {
-            console.log('Committing main meeting document batch to Firestore...');
-            await batch.commit();
-            console.log('Main document batch committed successfully');
+            await batch.set(meetingRef, meetingData);
+            console.log('Meeting document added to batch successfully');
           } catch (error) {
-            console.error('Error committing main document batch to Firestore:', error);
+            console.error('Error adding meeting document to batch:', error);
             throw error;
           }
-          
-          // Now save each action item individually instead of in a batch
-          console.log('Saving action items individually...');
-          let savedCount = 0;
-          
-          for (const item of allActionItems) {
-            try {
-              const actionItemId = `${uniqueId}-${Math.random().toString(36).substring(2, 15)}`;
-              const actionItemRef = doc(db, 'transcript', user.email as string, 'actionItems', actionItemId);
-              
-              // Create action item with required fields
-              const actionItemData = {
-                id: actionItemId,
-                title: item.title,
-                description: item.description,
-                done: false,
-                meeting: {
-                  id: uniqueId,
-                  name: meetingName || 'New Meeting'
-                },
-                timestamp: serverTimestamp()
-              };
 
-              console.log(`Saving Action Item ${savedCount + 1}:`, actionItemData);
-              await setDoc(actionItemRef, actionItemData);
-              savedCount++;
-            } catch (itemError) {
-              console.error(`Error saving action item: ${itemError}`);
-              // Continue saving other items if possible
+          // Save action items to Firestore
+          if (allActionItems.length > 0) {
+            setProcessingStatus('Saving action items...');
+            console.log('=== Processing Action Items ===');
+            console.log(`Found ${allActionItems.length} action items to process`);
+            
+            // First commit the main meeting document batch to reduce transaction size
+            try {
+              console.log('Committing main meeting document batch to Firestore...');
+              await batch.commit();
+              console.log('Main document batch committed successfully');
+            } catch (error) {
+              console.error('Error committing main document batch to Firestore:', error);
+              throw error;
+            }
+            
+            // Now save each action item individually instead of in a batch
+            console.log('Saving action items individually...');
+            let savedCount = 0;
+            
+            for (const item of allActionItems) {
+              try {
+                const actionItemId = `${uniqueId}-${Math.random().toString(36).substring(2, 15)}`;
+                const actionItemRef = doc(db, 'transcript', user.email as string, 'actionItems', actionItemId);
+                
+                // Create action item with required fields
+                const actionItemData = {
+                  id: actionItemId,
+                  title: item.title,
+                  description: item.description,
+                  done: false,
+                  meeting: {
+                    id: uniqueId,
+                    name: meetingName || 'New Meeting'
+                  },
+                  timestamp: serverTimestamp()
+                };
+
+                console.log(`Saving Action Item ${savedCount + 1}:`, actionItemData);
+                await setDoc(actionItemRef, actionItemData);
+                savedCount++;
+              } catch (itemError) {
+                console.error(`Error saving action item: ${itemError}`);
+                // Continue saving other items if possible
+              }
+            }
+            
+            console.log('=== Action Items Saved Successfully ===');
+            console.log(`Total action items saved: ${savedCount} of ${allActionItems.length}`);
+          } else {
+            // If no action items, just commit the main document batch
+            try {
+              console.log('Committing batch to Firestore...');
+              await batch.commit();
+              console.log('Batch committed successfully');
+            } catch (error) {
+              console.error('Error committing batch to Firestore:', error);
+              throw error;
             }
           }
-          
-          console.log('=== Action Items Saved Successfully ===');
-          console.log(`Total action items saved: ${savedCount} of ${allActionItems.length}`);
-        } else {
-          // If no action items, just commit the main document batch
-          try {
-            console.log('Committing batch to Firestore...');
-            await batch.commit();
-            console.log('Batch committed successfully');
-          } catch (error) {
-            console.error('Error committing batch to Firestore:', error);
-            throw error;
-          }
+
+          console.log('=== Meeting Document Saved Successfully ===');
+          // Add detailed information about document location
+          console.log(`DOCUMENT LOCATION: /transcript/${user.email}/timestamps/${uniqueId}`);
+          console.log(`USER EMAIL: ${user.email}`);
+          console.log(`DOCUMENT ID: ${uniqueId}`);
+          console.log(`FULL PATH: firestore.googleapis.com/v1/projects/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/databases/(default)/documents/transcript/${user.email}/timestamps/${uniqueId}`);
+
+          // Export to Notion if integration exists
+          console.log('=== Starting Automation Processing ===');
+          console.log('User:', user.email);
+          console.log('Meeting ID:', uniqueId);
+          console.log('Meeting Name:', meetingName || 'New Meeting');
+
+          setProcessingStatus('Processing automations...');
+          await exportToNotion(user.email);
+
+          console.log('=== Automation Processing Complete ===');
+
+          setIsProcessing(false);
+          refreshMeetings();
+          onOpenChange(false);
+
+        } catch (error) {
+          console.error('API request failed:', error);
+          throw error;
         }
-
-        console.log('=== Meeting Document Saved Successfully ===');
-        // Add detailed information about document location
-        console.log(`DOCUMENT LOCATION: /transcript/${user.email}/timestamps/${uniqueId}`);
-        console.log(`USER EMAIL: ${user.email}`);
-        console.log(`DOCUMENT ID: ${uniqueId}`);
-        console.log(`FULL PATH: firestore.googleapis.com/v1/projects/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/databases/(default)/documents/transcript/${user.email}/timestamps/${uniqueId}`);
-
-        // Export to Notion if integration exists
-        console.log('=== Starting Automation Processing ===');
-        console.log('User:', user.email);
-        console.log('Meeting ID:', uniqueId);
-        console.log('Meeting Name:', meetingName || 'New Meeting');
-
-        setProcessingStatus('Processing automations...');
-        await exportToNotion(user.email);
-
-        console.log('=== Automation Processing Complete ===');
-
-        setIsProcessing(false);
-        refreshMeetings();
-        onOpenChange(false);
 
       } catch (error) {
         console.error('API request failed:', error);

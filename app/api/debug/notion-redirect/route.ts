@@ -1,51 +1,35 @@
-export const dynamic = 'force-dynamic';
+import { NextResponse } from 'next/server';
+import { getFirebaseDb } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
-import { NextRequest, NextResponse } from 'next/server';
-
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
-    // Get the configured environment variables
+    const { searchParams } = new URL(request.url);
+    const userEmail = searchParams.get('email');
+
+    if (!userEmail) {
+      return NextResponse.json({ error: 'No email provided' }, { status: 400 });
+    }
+
     const clientId = process.env.NOTION_CLIENT_ID || '';
-    const clientSecret = process.env.NOTION_CLIENT_SECRET ? '[REDACTED]' : '';
+    const clientSecret = process.env.NOTION_CLIENT_SECRET || '';
     const redirectUri = process.env.NOTION_REDIRECT_URI || '';
-    const baseUrl = process.env.NEXTAUTH_URL || 'https://localhost:3001';
-    
-    // Check if the email parameter is provided
-    const email = request.nextUrl.searchParams.get('email');
 
-    // Build the OAuth URL for testing
-    const fullRedirectUri = `${baseUrl}/api/notion/callback`;
-    
-    // Create parameter object for OAuth URL
-    const params = {
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      owner: 'user',
-      state: email || 'test@example.com'
-    };
-    
-    // Debug data to return
-    const debugData = {
-      environmentConfig: {
-        hasClientId: !!clientId,
-        clientIdPrefix: clientId ? `${clientId.substring(0, 5)}...` : null,
-        hasClientSecret: !!process.env.NOTION_CLIENT_SECRET,
-        configuredRedirectUri: redirectUri,
-        baseUrl,
-        computedRedirectUri: fullRedirectUri
-      },
-      authUrlParams: params,
-      fullAuthUrl: `https://api.notion.com/v1/oauth/authorize?${new URLSearchParams(params).toString()}`,
-      registeredCallbackEndpoint: '/api/notion/callback',
-      testCallbackUrl: `${baseUrl}/api/notion/callback?code=test_code&state=${email || 'test@example.com'}`
-    };
+    // Get user's Notion integration details
+    const db = getFirebaseDb();
+    const userDoc = await getDoc(doc(db, 'users', userEmail));
+    const notionIntegration = userDoc.data()?.notionIntegration;
 
-    return NextResponse.json(debugData);
+    return NextResponse.json({
+      clientId,
+      clientSecret,
+      redirectUri,
+      notionIntegration,
+      hasToken: !!notionIntegration?.accessToken,
+      tokenLength: notionIntegration?.accessToken?.length || 0
+    });
   } catch (error) {
     console.error('Error in notion-redirect debug endpoint:', error);
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

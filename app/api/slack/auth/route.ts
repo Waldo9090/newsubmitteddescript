@@ -5,16 +5,23 @@ import { cookies } from 'next/headers';
 const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID?.trim();
 const SLACK_REDIRECT_URI = process.env.SLACK_REDIRECT_URI?.trim();
 
-// Define required scopes - matching exactly what's in your Slack app settings
+// Define scopes matching exactly what's configured in Slack app settings
 const SLACK_SCOPES = [
-  'channels:read',
-  'chat:write',
-  'chat:write.customize',
-  'chat:write.public',
-  'groups:read',
-  'team:read',
-  'users:read',
-  'users:read.email'
+  // Bot Token Scopes
+  'channels:read',      // View basic information about public channels
+  'chat:write',        // Send messages as bot
+  'chat:write.public', // Send messages to channels bot isn't in
+  'groups:read',       // View private channels
+  'reactions:read',    // View emoji reactions
+  'team:read',         // View workspace info
+  'users:read',        // View people
+  'users:read.email',  // View email addresses
+].join(',');
+
+// User Token Scopes - these need to be requested separately
+const USER_SCOPES = [
+  'identity.basic',    // View user identity
+  'identity.email',    // View user email
 ].join(',');
 
 export async function GET(request: Request) {
@@ -31,19 +38,13 @@ export async function GET(request: Request) {
     const headersList = headers();
     const authHeader = headersList.get('Authorization');
     if (!authHeader) {
-      return new NextResponse(
-        JSON.stringify({ error: 'No authorization header' }),
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'No authorization header' }, { status: 401 });
     }
 
     // Extract the email from the Authorization header
     const userEmail = authHeader.split(' ')[1];
     if (!userEmail) {
-      return new NextResponse(
-        JSON.stringify({ error: 'No user email provided' }),
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'No user email provided' }, { status: 401 });
     }
 
     // Set the user email cookie with secure settings
@@ -56,45 +57,26 @@ export async function GET(request: Request) {
       httpOnly: true
     });
 
-    // Construct Slack OAuth URL with properly formatted client_id
-    const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=${SLACK_SCOPES}&redirect_uri=${encodeURIComponent(SLACK_REDIRECT_URI)}`;
+    // Construct Slack OAuth URL with exact matching scopes
+    const slackAuthUrl = new URL('https://slack.com/oauth/v2/authorize');
+    slackAuthUrl.searchParams.append('client_id', SLACK_CLIENT_ID);
+    slackAuthUrl.searchParams.append('scope', SLACK_SCOPES);
+    slackAuthUrl.searchParams.append('redirect_uri', SLACK_REDIRECT_URI);
+    slackAuthUrl.searchParams.append('user_scope', USER_SCOPES);
     
-    console.log('Generated Slack auth URL:', slackAuthUrl);
+    // Log the URL for debugging
+    console.log('Generated Slack auth URL:', {
+      url: slackAuthUrl.toString(),
+      scopes: SLACK_SCOPES,
+      userScopes: USER_SCOPES
+    });
     
-    // Get the origin of the request
-    const origin = headersList.get('origin') || '';
-
-    return new NextResponse(
-      JSON.stringify({ url: slackAuthUrl }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': origin,
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        },
-      }
-    );
+    return NextResponse.json({ url: slackAuthUrl.toString() });
   } catch (error) {
-    console.error('Error in Slack auth route:', error);
-    const headersList = headers();
-    const origin = headersList.get('origin') || '';
-
-    return new NextResponse(
-      JSON.stringify({ 
-        error: 'Failed to generate auth URL',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }),
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': origin,
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        },
-      }
+    console.error('Error generating Slack auth URL:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate Slack authorization URL' },
+      { status: 500 }
     );
   }
 }

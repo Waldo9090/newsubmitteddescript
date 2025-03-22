@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -7,10 +8,38 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
-import { Camera } from "lucide-react"
+import { Camera, Slack } from "lucide-react"
+import { getFirebaseDb } from "@/lib/firebase"
+import { doc, getDoc } from "firebase/firestore"
 
 export default function AccountSettings() {
   const { user } = useAuth();
+  const [slackConnected, setSlackConnected] = useState(false);
+  const [slackWorkspace, setSlackWorkspace] = useState("");
+  
+  useEffect(() => {
+    checkSlackConnection();
+  }, [user?.email]);
+
+  const checkSlackConnection = async () => {
+    if (!user?.email) return;
+
+    try {
+      const db = getFirebaseDb();
+      const userDoc = await getDoc(doc(db, 'users', user.email));
+      const slackIntegration = userDoc.data()?.slackIntegration;
+
+      if (slackIntegration?.teamId) {
+        setSlackConnected(true);
+        setSlackWorkspace(slackIntegration.teamName);
+      } else {
+        setSlackConnected(false);
+        setSlackWorkspace("");
+      }
+    } catch (error) {
+      console.error('Error checking Slack connection:', error);
+    }
+  };
   
   return (
     <div className="space-y-6">
@@ -56,6 +85,33 @@ export default function AccountSettings() {
           <div className="space-y-2">
             <Label htmlFor="company">Company</Label>
             <Input id="company" defaultValue="Acme Inc." />
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <h3 className="text-lg font-medium mb-4">Connected Accounts</h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center">
+                <Slack className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-medium">Slack</p>
+                <p className="text-sm text-muted-foreground">
+                  {slackConnected 
+                    ? `Connected to ${slackWorkspace}`
+                    : "Not connected"}
+                </p>
+              </div>
+            </div>
+            <Button 
+              variant={slackConnected ? "outline" : "default"}
+              onClick={() => window.location.href = "/dashboard/integrations"}
+            >
+              {slackConnected ? "Manage" : "Connect"}
+            </Button>
           </div>
         </div>
       </Card>

@@ -89,6 +89,42 @@ export default function CalendarSettings() {
           </div>
         </div>
       </div>
+
+      <div>
+        <h2 className="text-xl font-semibold mb-2">Joining preferences</h2>
+        <p className="text-muted-foreground mb-6">
+          Choose which meetings on your calendar you'd like Circleback to automatically join. You can use the
+          desktop app to record meetings Circleback doesn't join.
+        </p>
+
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium">All meetings</div>
+              <div className="text-sm text-muted-foreground">Join all meetings on my calendar</div>
+            </div>
+            <Switch />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium">Pending</div>
+              <div className="text-sm text-muted-foreground">Meetings I haven't yet accepted or declined</div>
+            </div>
+            <Switch />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium">Not organized by me</div>
+              <div className="text-sm text-muted-foreground">
+                Meetings where I'm an invitee, not the organizer
+              </div>
+            </div>
+            <Switch />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,30 +1,5 @@
 export const dynamic = 'force-dynamic';
 
-// Utility function to sanitize data before storing in Firestore
-function sanitizeForFirestore(data: any): any {
-  if (data === null || data === undefined) {
-    return null;
-  }
-  
-  if (typeof data !== 'object') {
-    return data;
-  }
-  
-  if (Array.isArray(data)) {
-    return data.map(item => sanitizeForFirestore(item));
-  }
-  
-  const sanitized: Record<string, any> = {};
-  
-  for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined) {
-      sanitized[key] = sanitizeForFirestore(value);
-    }
-  }
-  
-  return sanitized;
-}
-
 import { NextRequest, NextResponse } from 'next/server';
 import { Client } from '@notionhq/client';
 import { getFirebaseDb } from '@/lib/firebase';
@@ -100,19 +75,15 @@ export async function GET(request: NextRequest) {
     
     // Prepare the Notion integration data
     const notionIntegrationData = {
-      accessToken: data.access_token || '',
-      workspaceId: data.workspace_id || '',
-      workspaceName: workspaceInfo.name || '',
-      workspaceIcon: workspaceInfo.avatar_url || null,
-      botId: data.bot_id || '',
-      owner: data.owner || null,
-      duplicatedTemplateId: data.duplicated_template_id || null,
+      accessToken: data.access_token,
+      workspaceId: data.workspace_id,
+      workspaceName: workspaceInfo.name,
+      workspaceIcon: workspaceInfo.avatar_url,
+      botId: data.bot_id,
+      owner: data.owner,
+      duplicatedTemplateId: data.duplicated_template_id,
       updatedAt: new Date().toISOString()
     };
-    
-    // Sanitize data before saving to Firestore
-    const safeIntegrationData = sanitizeForFirestore(notionIntegrationData);
-    console.log('Sanitized Notion integration data structure:', Object.keys(safeIntegrationData));
     
     try {
       if (!userDoc.exists()) {
@@ -120,14 +91,14 @@ export async function GET(request: NextRequest) {
         // Create a new document
         await setDoc(userDocRef, {
           email: userId,
-          notionIntegration: safeIntegrationData,
+          notionIntegration: notionIntegrationData,
           createdAt: new Date().toISOString()
         });
       } else {
         console.log('User document exists, updating with new Notion integration data');
         // Update existing document
         await setDoc(userDocRef, {
-          notionIntegration: safeIntegrationData,
+          notionIntegration: notionIntegrationData,
           updatedAt: new Date().toISOString()
         }, { merge: true });
       }

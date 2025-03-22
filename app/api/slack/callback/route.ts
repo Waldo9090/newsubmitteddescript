@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID;
 const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET;
 const SLACK_REDIRECT_URI = process.env.SLACK_REDIRECT_URI;
-const BASE_URL = process.env.NEXTAUTH_URL || 'https://localhost:3003';
+const BASE_URL = process.env.NEXTAUTH_URL || 'https://localhost:3001';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,32 +60,52 @@ export async function GET(request: Request) {
     }
 
     try {
+      // Get bot details
+      const botDetails = {
+        botId: data.bot_user_id,
+        botAccessToken: data.access_token,
+        botEmail: `botuser-${data.team.id}-${data.bot_user_id}@slack-bots.com`,
+        botScopes: data.scope.split(','),
+        isEnterpriseInstall: data.is_enterprise_install || false
+      };
+
       // Store workspace data in slack_workspaces collection
       const workspaceDoc = doc(db, 'slack_workspaces', data.team.id);
+      const existingWorkspace = await getDoc(workspaceDoc);
+      
       await setDoc(workspaceDoc, {
         teamId: data.team.id,
         teamName: data.team.name,
-        teamUrl: data.team.url,
         botUserId: data.bot_user_id,
+        botAccessToken: data.access_token,
+        botEmail: botDetails.botEmail,
         botScopes: data.scope,
+        isEnterpriseInstall: botDetails.isEnterpriseInstall,
         installedBy: userEmail,
-        installedAt: new Date().toISOString(),
+        installedAt: existingWorkspace.exists() ? existingWorkspace.data().installedAt : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        connectedUsers: [userEmail], // Array of users who have connected to this workspace
+        connectedUsers: existingWorkspace.exists() 
+          ? Array.from(new Set([...existingWorkspace.data().connectedUsers, userEmail]))
+          : [userEmail]
       }, { merge: true });
 
-      // Store the access token and workspace info in the user's document
+      // Store the integration info in the user's document
       const userDoc = doc(db, 'users', userEmail);
       await setDoc(userDoc, {
         slackIntegration: {
-          accessToken: data.access_token,
           teamId: data.team.id,
           teamName: data.team.name,
-          scope: data.scope,
           botUserId: data.bot_user_id,
-          authedUser: data.authed_user,
+          botEmail: botDetails.botEmail,
+          authedUser: {
+            id: data.authed_user.id
+          },
+          type: 'slack',
+          config: {
+            channels: []
+          },
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         }
       }, { merge: true });
 
@@ -97,7 +117,6 @@ export async function GET(request: Request) {
     }
   } catch (error) {
     console.error('Error in Slack callback:', error);
-    // Always redirect back to the integrations page, even on error
     return NextResponse.redirect(`${BASE_URL}/dashboard/integrations?error=${encodeURIComponent(error instanceof Error ? error.message : 'Unknown error')}`);
   }
 } 

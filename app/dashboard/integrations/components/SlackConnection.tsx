@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Slack } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { ChevronLeft } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { getFirebaseDb } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { integrationIcons } from "@/app/lib/integration-icons";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface SlackChannel {
   id: string;
@@ -17,29 +17,21 @@ interface SlackChannel {
   isPrivate?: boolean;
 }
 
-interface SlackWorkspace {
-  teamId: string;
-  teamName: string;
-  channelId?: string;
-  channelName?: string;
-}
-
 interface SlackConnectionProps {
-  onSave: (config: any) => Promise<void>;
-  onCancel: () => void;
-  isAutomationForm?: boolean;
-  savedConfig?: any;
+  onBack: () => void;
 }
 
-export default function SlackConnection({ onSave, onCancel, isAutomationForm }: SlackConnectionProps) {
+export default function SlackConnection({ onBack }: SlackConnectionProps) {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [workspace, setWorkspace] = useState<SlackWorkspace | null>(null);
   const [channels, setChannels] = useState<SlackChannel[]>([]);
-  const [selectedChannels, setSelectedChannels] = useState<{ [key: string]: { sendNotes: boolean; sendActionItems: boolean } }>({});
-  const [isFetchingChannels, setIsFetchingChannels] = useState(false);
+  const [selectedChannel, setSelectedChannel] = useState<string>("");
+  const [selectedOptions, setSelectedOptions] = useState({
+    meetingNotes: true,
+    actionItems: true
+  });
 
   useEffect(() => {
     checkConnection();
@@ -54,37 +46,45 @@ export default function SlackConnection({ onSave, onCancel, isAutomationForm }: 
       const userDoc = await getDoc(doc(db, 'users', user.email));
       const slackIntegration = userDoc.data()?.slackIntegration;
 
-      if (slackIntegration?.accessToken) {
+      console.log('Checking Slack integration:', slackIntegration);
+
+      // Check for required fields in slackIntegration
+      if (slackIntegration && 
+          slackIntegration.teamId && 
+          slackIntegration.botUserId && 
+          slackIntegration.botEmail) {
+        console.log('Found valid Slack integration:', slackIntegration);
         setIsConnected(true);
-        setWorkspace({
-          teamId: slackIntegration.teamId,
-          teamName: slackIntegration.teamName,
-          channelId: slackIntegration.channelId,
-          channelName: slackIntegration.channelName,
-        });
-        await fetchChannels(slackIntegration.accessToken);
+        await fetchChannels(user.email);
+
+        // Restore saved configuration if it exists
+        const steps = userDoc.data()?.steps;
+        const slackStep = steps?.find((step: any) => step.id === 'slack');
+        if (slackStep) {
+          setSelectedChannel(slackStep.config.channelId);
+          setSelectedOptions({
+            meetingNotes: slackStep.config.meetingNotes,
+            actionItems: slackStep.config.actionItems
+          });
+        }
       } else {
+        console.log('No valid Slack integration found');
         setIsConnected(false);
-        setWorkspace(null);
         setChannels([]);
       }
     } catch (error) {
       console.error('Error checking Slack connection:', error);
       toast.error('Failed to check Slack connection status');
-      setIsConnected(false);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchChannels = async (accessToken: string) => {
-    if (!user?.email) return;
-
+  const fetchChannels = async (userEmail: string) => {
     try {
-      setIsFetchingChannels(true);
       const response = await fetch('/api/slack/channels', {
         headers: {
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `Bearer ${userEmail}`
         }
       });
       
@@ -100,8 +100,6 @@ export default function SlackConnection({ onSave, onCancel, isAutomationForm }: 
     } catch (error) {
       console.error('Error fetching channels:', error);
       toast.error('Failed to fetch Slack channels');
-    } finally {
-      setIsFetchingChannels(false);
     }
   };
 
@@ -125,6 +123,7 @@ export default function SlackConnection({ onSave, onCancel, isAutomationForm }: 
       }
       
       if (data.url) {
+        localStorage.setItem('slackConnecting', 'true');
         window.location.href = data.url;
       } else {
         throw new Error('No authorization URL received');
@@ -136,217 +135,172 @@ export default function SlackConnection({ onSave, onCancel, isAutomationForm }: 
     }
   };
 
-  const handleDisconnect = async () => {
-    if (!user?.email) return;
-
-    try {
-      const db = getFirebaseDb();
-      await setDoc(doc(db, 'users', user.email), {
-        slackIntegration: null
-      }, { merge: true });
-      
-      setIsConnected(false);
-      setWorkspace(null);
-      setChannels([]);
-      setSelectedChannels({});
-      toast.success('Successfully disconnected from Slack');
-    } catch (error) {
-      console.error('Error disconnecting from Slack:', error);
-      toast.error('Failed to disconnect from Slack');
-    }
-  };
-
-  const handleChannelToggle = (channelId: string) => {
-    setSelectedChannels(prev => {
-      const newSelectedChannels = { ...prev };
-      if (newSelectedChannels[channelId]) {
-        delete newSelectedChannels[channelId];
-      } else {
-        newSelectedChannels[channelId] = {
-          sendNotes: true,
-          sendActionItems: true
-        };
-      }
-      return newSelectedChannels;
-    });
-  };
-
-  const handleOptionToggle = (channelId: string, option: 'sendNotes' | 'sendActionItems') => {
-    setSelectedChannels(prev => ({
-      ...prev,
-      [channelId]: {
-        ...prev[channelId],
-        [option]: !prev[channelId][option]
-      }
-    }));
-  };
-
   const handleSave = async () => {
-    if (!user?.email || !workspace) return;
+    if (!user?.email || !selectedChannel) {
+      toast.error('Please select a channel');
+      return;
+    }
 
     try {
-      const selectedChannelIds = Object.keys(selectedChannels);
-
-      if (selectedChannelIds.length === 0) {
-        toast.error('Please select at least one channel');
-        return;
+      const channel = channels.find(c => c.id === selectedChannel);
+      if (!channel) {
+        throw new Error('Selected channel not found');
       }
 
-      const selectedChannelDetails = channels
-        .filter(channel => selectedChannels[channel.id])
-        .map(channel => ({
-          id: channel.id,
-          name: channel.name,
-          ...selectedChannels[channel.id]
-        }));
-
-      if (isAutomationForm) {
-        // Save to automation configuration
-        onSave({
-          channels: selectedChannelDetails
-        });
-      } else {
-        // Save to user's Slack integration settings
-        const db = getFirebaseDb();
-        await setDoc(doc(db, 'users', user.email), {
-          slackIntegration: {
-            ...workspace,
-            selectedChannels,
-            channelId: selectedChannelIds[0], // For backward compatibility
-            channelName: selectedChannelDetails[0]?.name,
-            updatedAt: new Date().toISOString()
-          }
-        }, { merge: true });
-        toast.success('Successfully saved Slack channel preferences');
+      const db = getFirebaseDb();
+      const userDocRef = doc(db, 'users', user.email);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (!userDoc.exists()) {
+        throw new Error('User document not found');
       }
+
+      const currentSteps = userDoc.data()?.steps || [];
+      const updatedSteps = currentSteps.filter((step: any) => step.id !== 'slack');
+      
+      updatedSteps.push({
+        id: 'slack',
+        config: {
+          channelId: channel.id,
+          channelName: channel.name,
+          meetingNotes: selectedOptions.meetingNotes,
+          actionItems: selectedOptions.actionItems
+        },
+        createdAt: new Date().toISOString()
+      });
+
+      await setDoc(userDocRef, {
+        steps: updatedSteps
+      }, { merge: true });
+
+      toast.success('Slack configuration saved');
+      onBack();
     } catch (error) {
-      console.error('Error saving channel preferences:', error);
-      toast.error('Failed to save channel preferences');
+      console.error('Error saving Slack configuration:', error);
+      toast.error('Failed to save Slack configuration');
     }
   };
+
+  useEffect(() => {
+    // Check for redirect from Slack OAuth
+    const params = new URLSearchParams(window.location.search);
+    const slackConnected = params.get('slack_connected');
+    const error = params.get('error');
+    const wasConnecting = localStorage.getItem('slackConnecting');
+
+    if (wasConnecting) {
+      localStorage.removeItem('slackConnecting');
+      
+      if (slackConnected === 'true') {
+        toast.success('Successfully connected to Slack');
+        checkConnection();
+      } else if (error) {
+        toast.error(`Failed to connect to Slack: ${decodeURIComponent(error)}`);
+        setIsConnecting(false);
+      }
+    }
+  }, []);
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center text-muted-foreground">Loading...</div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!isConnected) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Slack className="h-6 w-6" />
-            Connect Slack
-          </CardTitle>
-          <CardDescription>
-            Connect your Slack workspace to send meeting notes and action items
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={handleConnect} disabled={isConnecting}>
-            {isConnecting ? 'Connecting...' : 'Connect Slack'}
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="space-y-8">
+        <button onClick={onBack} className="flex items-center text-muted-foreground hover:text-foreground text-lg">
+          <ChevronLeft className="h-5 w-5 mr-2" />
+          Send notes to Slack
+        </button>
+        <div className="text-center text-muted-foreground">Loading...</div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Connect Slack</CardTitle>
-        <CardDescription>
-          Connect your Slack workspace to send meeting notes and action items
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center">
-                {integrationIcons.slack.icon}
-              </div>
-              <div>
-                <h4 className="text-sm font-medium">Slack</h4>
-                <p className="text-sm text-muted-foreground">
-                  {isConnected ? `Connected to ${workspace?.teamName}` : "Not connected"}
-                </p>
-              </div>
-            </div>
-            <Button
-              onClick={isConnected ? handleDisconnect : handleConnect}
-              variant={isConnected ? "outline" : "default"}
-              disabled={isConnecting}
-            >
-              {isConnecting ? "Connecting..." : isConnected ? "Disconnect" : "Connect"}
+    <div className="space-y-8">
+      <button onClick={onBack} className="flex items-center text-muted-foreground hover:text-foreground text-lg">
+        <ChevronLeft className="h-5 w-5 mr-2" />
+        Send notes to Slack
+      </button>
+
+      <div className="space-y-6 bg-card p-6 rounded-lg border border-border">
+        {!isConnected ? (
+          <div className="space-y-4">
+            <h2 className="text-lg font-medium">Connect to Slack</h2>
+            <p className="text-muted-foreground">
+              Connect your Slack workspace to send meeting notes and action items.
+            </p>
+            <Button onClick={handleConnect} disabled={isConnecting}>
+              {isConnecting ? 'Connecting...' : 'Connect Slack'}
             </Button>
           </div>
+        ) : (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-medium mb-3">Channel</h2>
+              <p className="text-muted-foreground mb-4">
+                Select the Slack channel you'd like to send your notes to. To select a private channel, add
+                @DescriptAI to it first.
+              </p>
+              <Select 
+                value={selectedChannel}
+                onValueChange={setSelectedChannel}
+              >
+                <SelectTrigger className="w-[300px]">
+                  <SelectValue placeholder="Choose a channel..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {channels.map((channel) => (
+                    <SelectItem key={channel.id} value={channel.id}>
+                      #{channel.name}
+                      {channel.isPrivate && " (private)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {isConnected && (
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium mb-2">Available Channels</h4>
-                {isFetchingChannels ? (
-                  <div className="text-sm text-muted-foreground">Loading channels...</div>
-                ) : channels.length > 0 ? (
-                  <div className="space-y-2">
-                    {channels.map(channel => (
-                      <div key={channel.id} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            checked={!!selectedChannels[channel.id]}
-                            onCheckedChange={() => handleChannelToggle(channel.id)}
-                          />
-                          <span className="text-sm">#{channel.name}</span>
-                          {channel.isPrivate && (
-                            <span className="text-xs bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded">
-                              Private
-                            </span>
-                          )}
-                        </div>
-                        {selectedChannels[channel.id] && (
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={selectedChannels[channel.id].sendNotes}
-                                onCheckedChange={() => handleOptionToggle(channel.id, 'sendNotes')}
-                              />
-                              <span className="text-sm">Notes</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={selectedChannels[channel.id].sendActionItems}
-                                onCheckedChange={() => handleOptionToggle(channel.id, 'sendActionItems')}
-                              />
-                              <span className="text-sm">Action Items</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">No channels available</div>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={onCancel}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave}>
-                  Save
-                </Button>
+            <div>
+              <h2 className="text-lg font-medium mb-3">What to include</h2>
+              <p className="text-muted-foreground mb-4">Choose what you'd like to send to Slack.</p>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id="meeting-notes"
+                    checked={selectedOptions.meetingNotes}
+                    onCheckedChange={(checked) =>
+                      setSelectedOptions((prev) => ({ ...prev, meetingNotes: checked as boolean }))
+                    }
+                    className="h-5 w-5"
+                  />
+                  <label htmlFor="meeting-notes" className="text-base font-medium">
+                    Meeting notes
+                  </label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id="action-items"
+                    checked={selectedOptions.actionItems}
+                    onCheckedChange={(checked) =>
+                      setSelectedOptions((prev) => ({ ...prev, actionItems: checked as boolean }))
+                    }
+                    className="h-5 w-5"
+                  />
+                  <label htmlFor="action-items" className="text-base font-medium">
+                    Action items
+                  </label>
+                </div>
               </div>
             </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+
+            <Button
+              onClick={handleSave}
+              className="mt-8 py-6 text-lg w-full"
+              size="lg"
+              disabled={!selectedChannel}
+            >
+              Done
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 } 

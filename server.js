@@ -11,7 +11,7 @@ const port = 3001;
 // Load SSL certificates
 const httpsOptions = {
   key: fs.readFileSync(path.join(__dirname, 'certificates/localhost-key.pem')),
-  cert: fs.readFileSync(path.join(__dirname, 'certificates/localhost-cert.pem')),
+  cert: fs.readFileSync(path.join(__dirname, 'certificates/localhost.pem')),
 };
 
 // Initialize Next.js

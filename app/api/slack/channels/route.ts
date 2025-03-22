@@ -1,77 +1,106 @@
 import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
+import { getFirebaseDb } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 export async function GET(request: Request) {
   try {
-    // Get the access token from Authorization header
-    const headersList = headers();
-    const authHeader = headersList.get('Authorization');
-    if (!authHeader) {
-      return new NextResponse(
-        JSON.stringify({ error: 'No authorization header' }),
-        { status: 401 }
-      );
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const accessToken = authHeader.split(' ')[1];
-    if (!accessToken) {
-      return new NextResponse(
-        JSON.stringify({ error: 'No access token provided' }),
-        { status: 401 }
-      );
-    }
-
-    // Fetch channels from Slack API
-    const response = await fetch('https://slack.com/api/conversations.list', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Slack API responded with status ${response.status}`);
-    }
-
-    const data = await response.json();
+    const userEmail = authHeader.split('Bearer ')[1];
+    const db = getFirebaseDb();
+    const userDoc = await getDoc(doc(db, 'users', userEmail));
     
-    if (!data.ok) {
-      throw new Error(data.error || 'Failed to fetch channels from Slack');
+    if (!userDoc.exists()) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Filter out archived channels and format the response
-    const channels = data.channels
-      .filter((channel: any) => !channel.is_archived)
-      .map((channel: any) => ({
+    const slackIntegration = userDoc.data()?.slackIntegration;
+    if (!slackIntegration?.teamId) {
+      return NextResponse.json({ error: 'Slack not connected' }, { status: 400 });
+    }
+
+    // Get workspace data to use bot token
+    const workspaceDoc = await getDoc(doc(db, 'slack_workspaces', slackIntegration.teamId));
+    if (!workspaceDoc.exists()) {
+      return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const workspaceData = workspaceDoc.data();
+    const botToken = workspaceData.botAccessToken;
+
+    if (!botToken) {
+      return NextResponse.json({ error: 'Bot token not found' }, { status: 400 });
+    }
+
+    console.log('Fetching channels for workspace:', slackIntegration.teamName);
+
+    // Fetch both public and private channels using Slack Web API
+    const [publicChannels, privateChannels] = await Promise.all([
+      fetch('https://slack.com/api/conversations.list?types=public_channel&limit=1000', {
+        headers: {
+          'Authorization': `Bearer ${botToken}`,
+          'Content-Type': 'application/json'
+        }
+      }),
+      fetch('https://slack.com/api/conversations.list?types=private_channel&limit=1000', {
+        headers: {
+          'Authorization': `Bearer ${botToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+    ]);
+
+    if (!publicChannels.ok || !privateChannels.ok) {
+      console.error('Failed to fetch channels:', {
+        publicStatus: publicChannels.status,
+        privateStatus: privateChannels.status
+      });
+      throw new Error('Failed to fetch channels from Slack API');
+    }
+
+    const [publicData, privateData] = await Promise.all([
+      publicChannels.json(),
+      privateChannels.json()
+    ]);
+    
+    if (!publicData.ok || !privateData.ok) {
+      console.error('Slack API error:', {
+        publicError: publicData.error,
+        privateError: privateData.error
+      });
+      throw new Error(publicData.error || privateData.error || 'Slack API error');
+    }
+
+    // Combine and format all channels
+    const allChannels = [
+      ...(publicData.channels || []),
+      ...(privateData.channels || [])
+    ]
+      .filter(channel => !channel.is_archived) // Filter out archived channels
+      .map(channel => ({
         id: channel.id,
         name: channel.name,
-        is_private: channel.is_private,
-        is_member: channel.is_member
-      }));
+        isPrivate: channel.is_private,
+        isMember: channel.is_member,
+        numMembers: channel.num_members
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)); // Sort channels alphabetically
 
-    return new NextResponse(
-      JSON.stringify({ channels }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    console.log('Returning channels:', {
+      total: allChannels.length,
+      public: publicData.channels?.length || 0,
+      private: privateData.channels?.length || 0
+    });
+
+    return NextResponse.json({ channels: allChannels });
   } catch (error) {
     console.error('Error fetching Slack channels:', error);
-    return new NextResponse(
-      JSON.stringify({ 
-        error: 'Failed to fetch channels',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }),
-      { 
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
+    return NextResponse.json(
+      { error: 'Failed to fetch channels' },
+      { status: 500 }
     );
   }
 }

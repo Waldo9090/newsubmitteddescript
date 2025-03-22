@@ -24,6 +24,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Linear not connected' }, { status: 400 });
     }
 
+    if (!linearIntegration.selectedTeamId) {
+      return NextResponse.json({ error: 'No Linear team selected' }, { status: 400 });
+    }
+
     // Get meeting data
     const meetingDoc = await getDoc(doc(db, 'transcript', user.email, 'timestamps', meetingId));
     if (!meetingDoc.exists()) {
@@ -49,15 +53,8 @@ export async function POST(request: Request) {
             },
             body: JSON.stringify({
               query: `
-                mutation CreateIssue($title: String!, $description: String, $assigneeId: String) {
-                  issueCreate(
-                    input: {
-                      title: $title
-                      description: $description
-                      assigneeId: $assigneeId
-                      teamId: "${linearIntegration.teamId}"
-                    }
-                  ) {
+                mutation CreateIssue($input: IssueCreateInput!) {
+                  issueCreate(input: $input) {
                     success
                     issue {
                       id
@@ -68,21 +65,30 @@ export async function POST(request: Request) {
                 }
               `,
               variables: {
-                title: item.text,
-                description: `Created from meeting: ${meetingData.title || 'Untitled Meeting'}\nDate: ${new Date(meetingData.timestamp).toLocaleString()}`,
-                assigneeId: item.assignee // Assuming this is the Linear user ID
+                input: {
+                  title: item.text,
+                  description: `Created from meeting: ${meetingData.title || 'Untitled Meeting'}\nDate: ${new Date(meetingData.timestamp).toLocaleString()}`,
+                  assigneeId: item.assignee, // Assuming this is the Linear user ID
+                  teamId: linearIntegration.selectedTeamId,
+                  priority: 2, // Normal priority
+                }
               },
             }),
           });
 
           const data = await response.json();
+          
+          if (data.errors) {
+            throw new Error(data.errors[0].message);
+          }
+
           return {
             actionItemId: item.id,
             success: data.data?.issueCreate?.success || false,
             issue: data.data?.issueCreate?.issue,
-            error: data.errors?.[0]?.message
           };
         } catch (error) {
+          console.error('Error creating Linear issue:', error);
           return {
             actionItemId: item.id,
             success: false,
