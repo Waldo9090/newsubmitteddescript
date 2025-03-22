@@ -58,46 +58,105 @@ export async function exportToNotion(userEmail: string) {
     console.log('User:', userEmail);
     
     const db = getFirebaseDb();
+
+    // Get the most recent transcript document
+    const transcriptRef = collection(db, `transcript/${userEmail}/timestamps`);
+    const transcriptQuery = query(transcriptRef, orderBy('timestamp', 'desc'), limit(1));
+    const transcriptSnapshot = await getDocs(transcriptQuery);
+
+    if (transcriptSnapshot.empty) {
+      throw new Error('No transcript found');
+    }
+
+    const transcriptDoc = transcriptSnapshot.docs[0];
+    const transcriptData = transcriptDoc.data() as TranscriptData;
+    console.log('Found transcript:', {
+      id: transcriptDoc.id,
+      name: transcriptData.name,
+      timestamp: transcriptData.timestamp,
+      hasNotes: !!transcriptData.notes,
+      actionItemsCount: transcriptData.actionItems?.length
+    });
+
+    // Get user document for integration data
     const userDoc = await getDoc(doc(db, 'users', userEmail));
-    
     if (!userDoc.exists()) {
       throw new Error('User document not found');
     }
-
     const userData = userDoc.data();
-    const transcriptData = userData.transcriptData as TranscriptData;
 
-    if (!transcriptData) {
-      throw new Error('No transcript data found');
-    }
+    // Get all documents in the integratedautomations collection for this user
+    const automationsRef = collection(db, `integratedautomations/${userEmail}/automations`);
+    const automationDocs = await getDocs(automationsRef);
 
-    // Get automation configuration from integratedAutomations collection
-    const automationDoc = await getDoc(doc(db, 'integratedAutomations', userEmail));
-    const automationData = automationDoc.exists() ? automationDoc.data() : null;
+    console.log(`Found ${automationDocs.size} automation documents`);
 
-    console.log('Fetched automation configuration:', automationData);
+    // Process each automation document
+    for (const automationDoc of automationDocs.docs) {
+      console.log(`Processing automation: ${automationDoc.id}`);
+      
+      // Get all steps for this automation
+      const stepsRef = collection(automationDoc.ref, 'steps');
+      const stepDocs = await getDocs(stepsRef);
 
-    // Process each automation type
-    if (userData.notionIntegration) {
-      await processNotionStep(transcriptData, userEmail, userData.notionIntegration as NotionConfig);
-    }
+      console.log(`Found ${stepDocs.size} steps`);
 
-    // Check for Slack automation in the integratedAutomations collection
-    if (automationData?.slack) {
-      console.log('Found Slack automation configuration:', automationData.slack);
-      await processSlackStep(transcriptData, userEmail, {
-        type: 'slack',
-        config: {
-          channelId: automationData.slack.config.channelId,
-          channelName: automationData.slack.config.channelName,
-          sendNotes: automationData.slack.config.sendNotes,
-          sendActionItems: automationData.slack.config.sendActionItems
+      // Process each step
+      for (const stepDoc of stepDocs.docs) {
+        const stepData = stepDoc.data();
+        console.log('Processing step:', {
+          id: stepData.id,
+          type: stepData.type
+        });
+
+        try {
+          switch (stepData.type) {
+            case 'notion':
+              if (userData.notionIntegration) {
+                await processNotionStep(transcriptData, userEmail, {
+                  pageId: stepData.pageId,
+                  pageTitle: stepData.pageTitle,
+                  workspaceIcon: stepData.workspaceIcon,
+                  workspaceId: stepData.workspaceId,
+                  workspaceName: stepData.workspaceName,
+                  exportNotes: stepData.exportNotes,
+                  exportActionItems: stepData.exportActionItems
+                });
+              }
+              break;
+
+            case 'slack':
+              if (userData.slackIntegration) {
+                await processSlackStep(transcriptData, userEmail, {
+                  channelId: stepData.channelId,
+                  channelName: stepData.channelName,
+                  sendNotes: stepData.sendNotes,
+                  sendActionItems: stepData.sendActionItems,
+                  type: stepData.type
+                });
+              }
+              break;
+
+            case 'hubspot':
+              if (userData.hubspotIntegration) {
+                await processHubSpotStep(transcriptData, userEmail);
+              }
+              break;
+
+            case 'linear':
+              if (userData.linearIntegration) {
+                await processLinearStep(transcriptData, userEmail);
+              }
+              break;
+
+            default:
+              console.log(`Unknown step type: ${stepData.type}`);
+          }
+        } catch (error) {
+          console.error(`Error processing step ${stepData.type}:`, error);
+          // Continue processing other steps even if one fails
         }
-      });
-    }
-
-    if (userData.hubspotIntegration) {
-      await processHubSpotStep(transcriptData, userEmail);
+      }
     }
 
     console.log('=== Export Process Complete ===');
@@ -284,14 +343,12 @@ async function processNotionStep(transcriptData: TranscriptData, userEmail: stri
 export async function processSlackStep(
   transcript: TranscriptData,
   userEmail: string,
-  step: {
+  stepData: {
+    channelId: string;
+    channelName: string;
+    sendNotes: boolean;
+    sendActionItems: boolean;
     type: string;
-    config: {
-      channelId: string;
-      channelName: string;
-      sendNotes: boolean;
-      sendActionItems: boolean;
-    };
   }
 ): Promise<void> {
   console.log('Processing Slack step:', {
@@ -299,7 +356,7 @@ export async function processSlackStep(
     userEmail,
     hasNotes: !!transcript.notes,
     actionItemsCount: transcript.actionItems?.length,
-    channelName: step.config.channelName
+    channelName: stepData.channelName
   });
 
   try {
@@ -311,9 +368,15 @@ export async function processSlackStep(
     }
 
     const slackIntegration = userDoc.data()?.slackIntegration;
-    if (!slackIntegration?.teamId) {
-      throw new Error('Slack integration not found');
+    if (!slackIntegration?.teamId || !slackIntegration?.botUserId || !slackIntegration?.botEmail) {
+      throw new Error('Slack integration not found or incomplete');
     }
+
+    console.log('Found Slack integration:', {
+      teamId: slackIntegration.teamId,
+      teamName: slackIntegration.teamName,
+      botUserId: slackIntegration.botUserId
+    });
 
     // Get workspace data to use bot token
     const workspaceDoc = await getDoc(doc(db, 'slack_workspaces', slackIntegration.teamId));
@@ -354,7 +417,7 @@ export async function processSlackStep(
     ];
 
     // Add notes if configured and available
-    if (step.config.sendNotes && transcript.notes) {
+    if (stepData.sendNotes && transcript.notes) {
       blocks.push(
         {
           type: 'section',
@@ -377,7 +440,7 @@ export async function processSlackStep(
     }
 
     // Add action items if configured and available
-    if (step.config.sendActionItems && transcript.actionItems?.length > 0) {
+    if (stepData.sendActionItems && transcript.actionItems?.length > 0) {
       blocks.push(
         {
           type: 'section',
@@ -400,7 +463,7 @@ export async function processSlackStep(
     }
 
     try {
-      console.log(`Sending message to channel ${step.config.channelName} (${step.config.channelId})`);
+      console.log(`Sending message to channel ${stepData.channelName} (${stepData.channelId})`);
       
       const response = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
@@ -409,7 +472,7 @@ export async function processSlackStep(
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          channel: step.config.channelId,
+          channel: stepData.channelId,
           blocks,
           unfurl_links: false,
           unfurl_media: false
@@ -422,9 +485,9 @@ export async function processSlackStep(
         throw new Error(data.error || 'Failed to send message');
       }
 
-      console.log('Successfully sent message to Slack channel:', step.config.channelName);
+      console.log('Successfully sent message to Slack channel:', stepData.channelName);
     } catch (error) {
-      console.error('Error sending message to channel:', step.config.channelName, error);
+      console.error('Error sending message to channel:', stepData.channelName, error);
       throw error;
     }
   } catch (error) {
@@ -641,73 +704,4 @@ async function processSalesforceStep(
   }
 
   return true;
-}
-
-export async function processStep(step: string, transcriptData: any, userEmail: string) {
-  try {
-    console.log('[Process Step] Processing step:', { step, userEmail });
-
-    // Get user document to check configuration
-    const db = getFirebaseDb();
-    const userDoc = doc(db, 'users', userEmail);
-    const userSnapshot = await getDoc(userDoc);
-
-    if (!userSnapshot.exists()) {
-      throw new Error('User document not found');
-    }
-
-    const userData = userSnapshot.data();
-
-    // Get automation configuration
-    const automationDoc = await getDoc(doc(db, 'integratedAutomations', userEmail));
-    const automationData = automationDoc.exists() ? automationDoc.data() : null;
-
-    console.log('[Process Step] Automation configuration:', automationData);
-
-    switch (step) {
-      case 'notion':
-        return await processNotionStep(transcriptData, userEmail, userData.notionIntegration as NotionConfig);
-      case 'slack':
-        // Check if there's a Slack configuration in the automation
-        if (!automationData?.slack) {
-          console.log('[Process Step] No Slack configuration found');
-          return;
-        }
-
-        const slackConfig = automationData.slack.config;
-        console.log('[Process Step] Found Slack configuration:', slackConfig);
-
-        // Only process if either notes or action items are enabled
-        if (slackConfig.sendNotes || slackConfig.sendActionItems) {
-          return await processSlackStep(transcriptData, userEmail, {
-            type: 'slack',
-            config: {
-              channelId: slackConfig.channelId,
-              channelName: slackConfig.channelName,
-              sendNotes: slackConfig.sendNotes,
-              sendActionItems: slackConfig.sendActionItems
-            }
-          });
-        } else {
-          console.log('[Process Step] Slack step skipped - neither notes nor action items are enabled');
-        }
-        break;
-      case 'hubspot':
-        return await processHubSpotStep(transcriptData, userEmail);
-      case 'linear':
-        return await processLinearStep(transcriptData, userEmail);
-      case 'salesforce':
-        return await processSalesforceStep(transcriptData, userEmail, userData.salesforce?.config || {});
-      default:
-        throw new Error(`Unknown step: ${step}`);
-    }
-  } catch (error: any) {
-    console.error('[Process Step] Error processing step:', {
-      step,
-      error,
-      stack: error?.stack,
-      message: error?.message
-    });
-    throw error;
-  }
 } 
