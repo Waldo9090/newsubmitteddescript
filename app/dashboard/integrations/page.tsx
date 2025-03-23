@@ -1796,6 +1796,13 @@ export default function IntegrationsPage() {
                 tags: step.config.tags || []
               });
               break;
+
+            case 'linear':
+              Object.assign(stepData, {
+                teamId: step.config.teamId || "",
+                teamName: step.config.teamName || ""
+              });
+              break;
           }
         }
 

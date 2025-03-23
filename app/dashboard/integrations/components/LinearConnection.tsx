@@ -146,14 +146,8 @@ export default function LinearConnection() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Connect Linear</CardTitle>
-        <CardDescription>
-          Connect your Linear workspace to create issues from meeting action items
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col space-y-6">
+      <CardContent className="pt-6">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center">
@@ -170,34 +164,35 @@ export default function LinearConnection() {
               onClick={isConnected ? handleDisconnect : handleConnect}
               variant={isConnected ? "outline" : "default"}
               disabled={isConnecting}
+              className="rounded-full"
             >
               {isConnecting ? "Connecting..." : isConnected ? "Disconnect" : "Connect"}
             </Button>
           </div>
 
+          {!isConnected && (
+            <div className="text-sm text-muted-foreground">
+              Connect your Linear workspace to create issues from meeting action items.
+            </div>
+          )}
+
           {isConnected && workspace && (
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium mb-2">Select Team</h4>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Choose which team to create issues in
-                </p>
-                <Select 
-                  value={workspace.selectedTeamId} 
-                  onValueChange={handleTeamSelect}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {workspace.teams.map((team) => (
-                      <SelectItem key={team.id} value={team.id}>
-                        {team.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="hidden">
+              <Select 
+                value={workspace.selectedTeamId} 
+                onValueChange={handleTeamSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a team" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workspace.teams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
         </div>

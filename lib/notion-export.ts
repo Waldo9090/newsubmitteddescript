@@ -146,7 +146,7 @@ export async function exportToNotion(userEmail: string) {
 
             case 'linear':
               if (userData.linearIntegration) {
-                await processLinearStep(transcriptData, userEmail);
+                await processLinearStep(transcriptData, userEmail, stepData as { teamId: string; teamName: string });
               }
               break;
 
@@ -542,13 +542,145 @@ async function processHubSpotStep(transcriptData: any, userEmail: string) {
   return true;
 }
 
-async function processLinearStep(transcriptData: any, userEmail: string) {
-  console.log('[Linear Export] Processing Linear step:', {
-    hasTranscriptData: !!transcriptData,
-    userEmail
+async function processLinearStep(transcriptData: TranscriptData, userEmail: string, stepData: { teamId: string; teamName: string }) {
+  console.log('=== Starting Linear Step Processing ===');
+  console.log('Processing Linear step for:', {
+    userEmail,
+    meetingName: transcriptData.name,
+    timestamp: transcriptData.timestamp,
+    teamId: stepData.teamId,
+    teamName: stepData.teamName
   });
-  // Implementation to be added
-  return true;
+  
+  try {
+    // Get user's Linear integration data from Firestore
+    console.log('Fetching Linear integration data from Firestore...');
+    const db = getFirebaseDb();
+    const userDoc = await getDoc(doc(db, 'users', userEmail));
+    const linearIntegration = userDoc.data()?.linearIntegration;
+
+    console.log('Linear integration data:', {
+      hasIntegration: !!linearIntegration,
+      hasAccessToken: !!linearIntegration?.accessToken,
+      tokenType: linearIntegration?.tokenType,
+      scope: linearIntegration?.scope,
+      userId: linearIntegration?.userId,
+      userName: linearIntegration?.userName
+    });
+
+    if (!linearIntegration?.accessToken) {
+      console.error('No Linear access token found in user document');
+      return;
+    }
+
+    // Extract action items from transcript data
+    console.log('Extracting action items from transcript:', {
+      hasActionItems: !!transcriptData.actionItems,
+      actionItemCount: transcriptData.actionItems?.length || 0
+    });
+
+    const actionItems = transcriptData.actionItems || [];
+    if (actionItems.length === 0) {
+      console.log('No action items found in transcript data');
+      return;
+    }
+
+    console.log(`Found ${actionItems.length} action items to process:`, 
+      actionItems.map(item => ({
+        id: item.id,
+        title: item.title,
+        hasDescription: !!item.description,
+        done: item.done
+      }))
+    );
+
+    // Create issues for each action item
+    for (const actionItem of actionItems) {
+      console.log(`Processing action item: ${actionItem.title}`);
+      
+      try {
+        console.log('Creating Linear issue with data:', {
+          teamId: stepData.teamId,
+          title: actionItem.title,
+          descriptionLength: actionItem.description?.length || 0
+        });
+
+        const response = await fetch('https://api.linear.app/graphql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${linearIntegration.accessToken}`
+          },
+          body: JSON.stringify({
+            query: `
+              mutation CreateIssue($input: IssueCreateInput!) {
+                issueCreate(input: $input) {
+                  success
+                  issue {
+                    id
+                    identifier
+                    url
+                    title
+                    description
+                  }
+                }
+              }
+            `,
+            variables: {
+              input: {
+                teamId: stepData.teamId,
+                title: actionItem.title,
+                description: `${actionItem.description}\n\nCreated from meeting: ${transcriptData.name || 'Untitled Meeting'}\nTimestamp: ${new Date(transcriptData.timestamp).toLocaleString()}`,
+                priority: 2
+              }
+            }
+          })
+        });
+
+        const data = await response.json();
+        console.log('Linear API response:', {
+          status: response.status,
+          ok: response.ok,
+          hasErrors: !!data.errors,
+          errors: data.errors,
+          success: data.data?.issueCreate?.success,
+          issueData: data.data?.issueCreate?.issue
+        });
+        
+        if (data.errors) {
+          console.error('Error creating Linear issue:', {
+            errors: data.errors,
+            actionItem: actionItem.title
+          });
+          continue;
+        }
+
+        if (data.data?.issueCreate?.success) {
+          console.log('Successfully created Linear issue:', {
+            identifier: data.data.issueCreate.issue.identifier,
+            url: data.data.issueCreate.issue.url,
+            title: data.data.issueCreate.issue.title
+          });
+        }
+      } catch (error) {
+        console.error('Error creating Linear issue for action item:', {
+          actionItem: actionItem.title,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
+      }
+    }
+
+    console.log('=== Linear Step Processing Complete ===');
+  } catch (error) {
+    console.error('Fatal error in processLinearStep:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      userEmail,
+      meetingName: transcriptData.name
+    });
+    throw error;
+  }
 }
 
 async function processAIInsightsStep(userEmail: string, stepData: any, transcriptData: TranscriptData, stepDocRef: any) {
