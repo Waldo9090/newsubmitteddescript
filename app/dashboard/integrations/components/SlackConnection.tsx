@@ -10,7 +10,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slack } from "lucide-react";
+import Image from "next/image";
 
 interface SlackChannel {
   id: string;
@@ -25,8 +25,9 @@ interface SlackConnectionProps {
 export default function SlackConnection({ onBack }: SlackConnectionProps) {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [workspace, setWorkspace] = useState<string>("");
   const [channels, setChannels] = useState<SlackChannel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<string>("");
   const [selectedOptions, setSelectedOptions] = useState({
@@ -42,20 +43,13 @@ export default function SlackConnection({ onBack }: SlackConnectionProps) {
     if (!user?.email) return;
 
     try {
-      setIsLoading(true);
       const db = getFirebaseDb();
       const userDoc = await getDoc(doc(db, 'users', user.email));
-      const slackIntegration = userDoc.data()?.slackIntegration;
+      const slackData = userDoc.data()?.slackIntegration;
 
-      console.log('Checking Slack integration:', slackIntegration);
-
-      // Check for required fields in slackIntegration
-      if (slackIntegration && 
-          slackIntegration.teamId && 
-          slackIntegration.botUserId && 
-          slackIntegration.botEmail) {
-        console.log('Found valid Slack integration:', slackIntegration);
+      if (slackData?.teamId) {
         setIsConnected(true);
+        setWorkspace(slackData.teamName || "");
         await fetchChannels(user.email);
 
         // Restore saved configuration if it exists
@@ -69,15 +63,16 @@ export default function SlackConnection({ onBack }: SlackConnectionProps) {
           });
         }
       } else {
-        console.log('No valid Slack integration found');
         setIsConnected(false);
+        setWorkspace("");
         setChannels([]);
       }
     } catch (error) {
       console.error('Error checking Slack connection:', error);
       toast.error('Failed to check Slack connection status');
-    } finally {
-      setIsLoading(false);
+      setIsConnected(false);
+      setWorkspace("");
+      setChannels([]);
     }
   };
 
@@ -189,27 +184,22 @@ export default function SlackConnection({ onBack }: SlackConnectionProps) {
     }
 
     try {
-      setIsConnecting(true);
-      const response = await fetch('/api/slack/disconnect', {
-        headers: {
-          'Authorization': `Bearer ${user.email}`
-        }
-      });
-      const data = await response.json();
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      setIsDisconnecting(true);
+      const db = getFirebaseDb();
       
-      if (data.success) {
-        toast.success('Successfully disconnected from Slack');
-        setIsConnected(false);
-        setChannels([]);
-      }
+      await setDoc(doc(db, 'users', user.email), {
+        slackIntegration: null
+      }, { merge: true });
+
+      setIsConnected(false);
+      setWorkspace("");
+      setChannels([]);
+      toast.success('Successfully disconnected from Slack');
     } catch (error) {
       console.error('Error disconnecting from Slack:', error);
       toast.error('Failed to disconnect from Slack');
-      setIsConnecting(false);
+    } finally {
+      setIsDisconnecting(false);
     }
   };
 
@@ -233,7 +223,7 @@ export default function SlackConnection({ onBack }: SlackConnectionProps) {
     }
   }, []);
 
-  if (isLoading) {
+  if (isConnecting || isDisconnecting) {
     return (
       <div className="text-center text-muted-foreground">Loading...</div>
     );
@@ -243,29 +233,35 @@ export default function SlackConnection({ onBack }: SlackConnectionProps) {
     <div className="space-y-6 bg-card p-6 rounded-lg border border-border">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center">
-            <Slack className="h-5 w-5" />
+          <div className="h-8 w-8 rounded-lg bg-[#E01E5A] flex items-center justify-center">
+            <Image
+              src="/icons/integrations/slack.svg"
+              alt="Slack"
+              width={24}
+              height={24}
+              className="rounded-sm"
+            />
           </div>
           <div>
             <h4 className="text-sm font-medium">Slack</h4>
             <p className="text-sm text-muted-foreground">
-              {isConnected ? "Connected" : "Not connected"}
+              {isConnected ? `Connected to ${workspace}` : 'Not connected'}
             </p>
           </div>
         </div>
         <Button
           onClick={isConnected ? handleDisconnect : handleConnect}
           variant={isConnected ? "outline" : "default"}
-          disabled={isConnecting}
+          disabled={isConnecting || isDisconnecting}
           className="rounded-full"
         >
-          {isConnecting ? "Connecting..." : isConnected ? "Disconnect" : "Connect"}
+          {isDisconnecting ? "Disconnecting..." : isConnecting ? "Connecting..." : isConnected ? "Disconnect" : "Connect"}
         </Button>
       </div>
 
       {!isConnected && (
         <div className="text-sm text-muted-foreground">
-          Connect your Slack workspace to automatically send meeting notes and action items.
+          Connect your Slack workspace to send meeting notes and action items.
         </div>
       )}
 

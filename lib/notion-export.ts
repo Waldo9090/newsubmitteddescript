@@ -1,4 +1,4 @@
-import { collection, query, orderBy, limit, getDocs, doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, getDoc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase';
 import { Client } from '@notionhq/client';
 
@@ -140,7 +140,16 @@ export async function exportToNotion(userEmail: string) {
 
             case 'hubspot':
               if (userData.hubspotIntegration) {
-                await processHubSpotStep(transcriptData, userEmail);
+                await processHubSpotStep(transcriptData, userEmail, stepData as {
+                  accountType: string;
+                  contacts: boolean;
+                  deals: boolean;
+                  id: string;
+                  includeActionItems: boolean;
+                  includeMeetingNotes: boolean;
+                  portalId: string;
+                  type: string;
+                });
               }
               break;
 
@@ -533,13 +542,131 @@ export async function processSlackStep(
   }
 }
 
-async function processHubSpotStep(transcriptData: any, userEmail: string) {
+async function processHubSpotStep(transcriptData: TranscriptData, userEmail: string, stepData: {
+  accountType: string;
+  contacts: boolean;
+  deals: boolean;
+  id: string;
+  includeActionItems: boolean;
+  includeMeetingNotes: boolean;
+  portalId: string;
+  type: string;
+}) {
   console.log('[HubSpot Export] Processing HubSpot step:', {
     hasTranscriptData: !!transcriptData,
-    userEmail
+    userEmail,
+    stepConfig: stepData
   });
-  // Implementation to be added
-  return true;
+
+  try {
+    // Get user's HubSpot integration data for authentication
+    const db = getFirebaseDb();
+    const userDoc = await getDoc(doc(db, 'users', userEmail));
+    const hubspotData = userDoc.data()?.hubspotIntegration;
+
+    if (!hubspotData?.accessToken || !hubspotData?.refreshToken) {
+      throw new Error('HubSpot authentication tokens not found');
+    }
+
+    // Check if token is expired or about to expire (within 5 minutes)
+    const expiresAt = new Date(hubspotData.expiresAt).getTime();
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+
+    if (now >= expiresAt - fiveMinutes) {
+      console.log('[HubSpot Export] Token expired or expiring soon, refreshing...');
+      
+      // Refresh the token
+      const response = await fetch('/api/hubspot/refresh-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          refreshToken: hubspotData.refreshToken,
+          userEmail
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh HubSpot token');
+      }
+
+      const { accessToken } = await response.json();
+      hubspotData.accessToken = accessToken;
+    }
+
+    // Prepare meeting content based on configuration
+    let meetingContent = '';
+    if (stepData.includeMeetingNotes && transcriptData.notes) {
+      meetingContent += `Meeting Notes:\n${transcriptData.notes}\n\n`;
+    }
+
+    if (stepData.includeActionItems && transcriptData.actionItems?.length > 0) {
+      meetingContent += 'Action Items:\n';
+      transcriptData.actionItems.forEach((item: ActionItem) => {
+        meetingContent += `- ${item.title}\n`;
+        if (item.description) {
+          meetingContent += `  ${item.description}\n`;
+        }
+      });
+    }
+
+    // Get timestamp in ISO format
+    let meetingDate: string;
+    const timestamp = transcriptData.timestamp;
+    
+    interface FirestoreTimestamp {
+      seconds: number;
+      nanoseconds: number;
+    }
+
+    function isFirestoreTimestamp(value: any): value is FirestoreTimestamp {
+      return typeof value === 'object' && value !== null && 
+             'seconds' in value && typeof value.seconds === 'number' &&
+             'nanoseconds' in value && typeof value.nanoseconds === 'number';
+    }
+
+    if (isFirestoreTimestamp(timestamp)) {
+      // Firestore timestamp
+      meetingDate = new Date(timestamp.seconds * 1000).toISOString();
+    } else if (typeof timestamp === 'number') {
+      // Unix timestamp in milliseconds
+      meetingDate = new Date(timestamp).toISOString();
+    } else {
+      // Fallback to current time
+      meetingDate = new Date().toISOString();
+    }
+
+    // Create engagement in HubSpot
+    const engagementResponse = await fetch('/api/hubspot/create-engagement', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        accessToken: hubspotData.accessToken,
+        portalId: stepData.portalId,
+        accountType: stepData.accountType,
+        contacts: stepData.contacts,
+        deals: stepData.deals,
+        meetingName: transcriptData.name || 'Meeting',
+        meetingDate,
+        content: meetingContent
+      })
+    });
+
+    if (!engagementResponse.ok) {
+      const error = await engagementResponse.json();
+      throw new Error(error.message || 'Failed to create HubSpot engagement');
+    }
+
+    console.log('[HubSpot Export] Successfully created engagement');
+    return true;
+  } catch (error) {
+    console.error('[HubSpot Export] Error:', error);
+    throw error;
+  }
 }
 
 async function processLinearStep(transcriptData: TranscriptData, userEmail: string, stepData: { teamId: string; teamName: string }) {

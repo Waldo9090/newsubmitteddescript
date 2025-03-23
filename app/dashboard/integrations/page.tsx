@@ -63,6 +63,8 @@ interface StepConfig {
   deals?: boolean;
   includeMeetingNotes?: boolean;
   includeActionItems?: boolean;
+  portalId?: string;
+  accountType?: string;
 }
 
 interface Step {
@@ -70,6 +72,13 @@ interface Step {
   title: string;
   type: StepType;
   config?: StepConfig;
+  // HubSpot specific fields
+  contacts?: boolean;
+  deals?: boolean;
+  includeMeetingNotes?: boolean;
+  includeActionItems?: boolean;
+  portalId?: string;
+  accountType?: string;
 }
 
 interface Tag {
@@ -137,6 +146,22 @@ interface NotionWorkspace {
   accessToken?: string;
   botId?: string;
   templateId?: string;
+}
+
+interface HubSpotIntegration {
+  accessToken: string;
+  refreshToken: string;
+  accountType: string;
+  portalId: string;
+  timezone: string;
+  expiresAt: string;
+  config: {
+    contacts: boolean;
+    deals: boolean;
+    includeMeetingNotes: boolean;
+    includeActionItems: boolean;
+  };
+  updatedAt: string;
 }
 
 const integrationIcons: Record<string, IntegrationIcon> = {
@@ -400,8 +425,24 @@ export default function IntegrationsPage() {
         const userData = userDoc.data();
         
         if (userData) {
+          // Check HubSpot connection first
+          const hubspotIntegration = userData.hubspotIntegration;
+          if (hubspotIntegration?.accessToken && hubspotIntegration?.portalId) {
+            console.log('Found valid HubSpot integration:', hubspotIntegration);
+            setHubspotConnected(true);
+            setHubspotConfig({
+              contacts: hubspotIntegration.config?.contacts ?? true,
+              deals: hubspotIntegration.config?.deals ?? false,
+              includeMeetingNotes: hubspotIntegration.config?.includeMeetingNotes ?? true,
+              includeActionItems: hubspotIntegration.config?.includeActionItems ?? true
+            });
+          } else {
+            console.log('No valid HubSpot integration found');
+            setHubspotConnected(false);
+          }
+
+          // Check Notion connection
           const notionIntegration = userData.notionIntegration;
-          
           if (notionIntegration?.accessToken) {
             setIsNotionConnected(true);
             setNotionWorkspace({
@@ -1445,15 +1486,34 @@ export default function IntegrationsPage() {
           </button>
 
           <div className="space-y-6 bg-card p-6 rounded-lg border border-border">
-            {!hubspotConnected ? (
-              <div className="space-y-4">
-                <h2 className="text-lg font-medium">Connect to HubSpot</h2>
-                <p className="text-muted-foreground">
-                  Connect your HubSpot account to log meetings and action items.
-                </p>
-                <Button onClick={handleHubSpotConnect}>Connect HubSpot</Button>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center">
+                  {renderIcon(integrationIcons.hubspot)}
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium">HubSpot</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {hubspotConnected ? "Connected" : "Not connected"}
+                  </p>
+                </div>
               </div>
-            ) : (
+              <Button
+                onClick={hubspotConnected ? handleHubSpotSave : handleHubSpotConnect}
+                variant={hubspotConnected ? "outline" : "default"}
+                className="rounded-full"
+              >
+                {hubspotConnected ? "Done" : "Connect"}
+              </Button>
+            </div>
+
+            {!hubspotConnected && (
+              <div className="text-sm text-muted-foreground">
+                Connect your HubSpot account to log meetings and action items.
+              </div>
+            )}
+
+            {hubspotConnected && (
               <div className="space-y-6">
                 <div>
                   <h2 className="text-lg font-medium mb-3">What to update</h2>
@@ -1751,17 +1811,39 @@ export default function IntegrationsPage() {
         console.log(`Processing step ${i}:`, step);
         
         // Base step data structure
-        const stepData = {
-          id: step.type, // This will be 'notion', 'slack', etc.
+        let stepData: Record<string, any> = {
+          id: step.type,
           type: step.type
         };
 
-        // Add configuration based on step type
-        if (step.config) {
+        // For HubSpot, check both direct properties and config
+        if (step.type === 'hubspot') {
+          const hubspotStep = step as Step & {
+            contacts?: boolean;
+            deals?: boolean;
+            includeMeetingNotes?: boolean;
+            includeActionItems?: boolean;
+            portalId?: string;
+            accountType?: string;
+          };
+
+          stepData = {
+            ...stepData,
+            contacts: hubspotStep.contacts || hubspotStep.config?.contacts || false,
+            deals: hubspotStep.deals || hubspotStep.config?.deals || false,
+            includeMeetingNotes: hubspotStep.includeMeetingNotes || hubspotStep.config?.includeMeetingNotes || false,
+            includeActionItems: hubspotStep.includeActionItems || hubspotStep.config?.includeActionItems || false,
+            portalId: hubspotStep.portalId || hubspotStep.config?.portalId || "",
+            accountType: hubspotStep.accountType || hubspotStep.config?.accountType || ""
+          };
+        }
+        // Add configuration based on step type for other integrations
+        else if (step.config) {
           console.log(`Adding config for step type ${step.type}:`, step.config);
           switch (step.type) {
             case 'notion':
-              Object.assign(stepData, {
+              stepData = {
+                ...stepData,
                 pageId: step.config.pageId || "",
                 pageTitle: step.config.pageTitle || "",
                 workspaceIcon: step.config.workspaceIcon || "",
@@ -1769,39 +1851,43 @@ export default function IntegrationsPage() {
                 workspaceName: step.config.workspaceName || "",
                 exportNotes: step.config.exportNotes || false,
                 exportActionItems: step.config.exportActionItems || false
-              });
+              };
               break;
 
             case 'slack':
-              Object.assign(stepData, {
+              stepData = {
+                ...stepData,
                 channelId: step.config.channelId || "",
                 channelName: step.config.channelName || "",
                 sendNotes: step.config.sendNotes || false,
                 sendActionItems: step.config.sendActionItems || false
-              });
+              };
               break;
 
             case 'ai-insights':
-              Object.assign(stepData, {
+              stepData = {
+                ...stepData,
                 name: step.config.name || "",
                 description: step.config.description || "",
                 count: step.config.count || "auto",
                 responses: step.config.responses || [],
                 createdAt: step.config.createdAt || new Date()
-              });
+              };
               break;
 
             case 'trigger':
-              Object.assign(stepData, {
+              stepData = {
+                ...stepData,
                 tags: step.config.tags || []
-              });
+              };
               break;
 
             case 'linear':
-              Object.assign(stepData, {
+              stepData = {
+                ...stepData,
                 teamId: step.config.teamId || "",
                 teamName: step.config.teamName || ""
-              });
+              };
               break;
           }
         }
@@ -1844,8 +1930,43 @@ export default function IntegrationsPage() {
   };
 
   const handleStepConfigSave = async (type: string, config: any): Promise<void> => {
-    // Implement the logic to save the step configuration
-    console.log('Saving step configuration:', type, config);
+    if (!user?.email) return;
+
+    try {
+      const db = getFirebaseDb();
+      const automationRef = doc(db, 'integratedautomations', user.email);
+      const existingSteps = [...steps];
+
+      // Find the step index if it exists
+      const stepIndex = existingSteps.findIndex(step => step.type === type);
+
+      // Create the step data with full configuration
+      const stepData = {
+        id: type,
+        type: type,
+        ...config  // Include the full configuration
+      };
+
+      // Add or update the step
+      if (stepIndex !== -1) {
+        existingSteps[stepIndex] = stepData;
+      } else {
+        existingSteps.push(stepData);
+      }
+
+      // Save to Firestore
+      await setDoc(automationRef, {
+        steps: existingSteps,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // Update local state
+      setSteps(existingSteps);
+      console.log(`Successfully saved step of type ${type}`);
+    } catch (error) {
+      console.error(`Error saving ${type} step:`, error);
+      sonnerToast(`Failed to save ${type} step`);
+    }
   };
 
   const handleHubSpotConnect = async () => {
@@ -1855,7 +1976,6 @@ export default function IntegrationsPage() {
     }
 
     try {
-      setIsSaving(true);
       const response = await fetch('/api/hubspot/auth', {
         headers: {
           'Content-Type': 'application/json',
@@ -1864,21 +1984,26 @@ export default function IntegrationsPage() {
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('HubSpot auth response error:', errorText);
         throw new Error('Failed to get authorization URL');
       }
 
       const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
       
       if (data.url) {
-        window.location.href = data.url;
+        const authUrl = new URL(data.url);
+        authUrl.searchParams.append('state', user.email);
+        window.location.href = authUrl.toString();
       } else {
         throw new Error('No authorization URL received');
       }
     } catch (error) {
       console.error('Error connecting to HubSpot:', error);
       sonnerToast("Failed to connect to HubSpot", { style: { backgroundColor: 'red', color: 'white' } });
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -1886,27 +2011,56 @@ export default function IntegrationsPage() {
     if (!user?.email) return;
 
     try {
-      setIsSaving(true);
+      const db = getFirebaseDb();
+      const userDoc = await getDoc(doc(db, 'users', user.email));
+      const hubspotData = userDoc.data()?.hubspotIntegration;
+
+      if (!hubspotData?.accessToken) {
+        throw new Error('HubSpot not connected');
+      }
+
+      // Update the integration with new config
+      const updatedIntegration = {
+        ...hubspotData,
+        config: hubspotConfig,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Save HubSpot integration configuration
+      await setDoc(doc(db, 'users', user.email), {
+        hubspotIntegration: updatedIntegration
+      }, { merge: true });
+
+      // Add HubSpot as a step with complete configuration
       const stepData: Step = {
         id: 'hubspot',
         type: 'hubspot',
-        title: 'HubSpot Integration',
-        config: {
-          contacts: hubspotConfig.contacts,
-          deals: hubspotConfig.deals,
-          includeMeetingNotes: hubspotConfig.includeMeetingNotes,
-          includeActionItems: hubspotConfig.includeActionItems
-        }
+        title: 'Update HubSpot',
+        contacts: hubspotConfig.contacts,
+        deals: hubspotConfig.deals,
+        includeMeetingNotes: hubspotConfig.includeMeetingNotes,
+        includeActionItems: hubspotConfig.includeActionItems,
+        portalId: hubspotData.portalId,
+        accountType: hubspotData.accountType
       };
 
-      setSteps(prev => [...prev, stepData]);
-      sonnerToast("HubSpot integration configured successfully", { style: { backgroundColor: 'green', color: 'white' } });
+      // Update steps state with the new step data
+      setSteps(prev => {
+        const newSteps = [...prev];
+        const existingIndex = newSteps.findIndex(step => step.type === 'hubspot');
+        if (existingIndex !== -1) {
+          newSteps[existingIndex] = stepData;
+        } else {
+          newSteps.push(stepData);
+        }
+        return newSteps;
+      });
+
       setCurrentStep(null);
+      sonnerToast("HubSpot settings saved", { style: { backgroundColor: 'green', color: 'white' } });
     } catch (error) {
       console.error('Error saving HubSpot config:', error);
-      sonnerToast("Failed to save HubSpot configuration", { style: { backgroundColor: 'red', color: 'white' } });
-    } finally {
-      setIsSaving(false);
+      sonnerToast("Failed to save settings", { style: { backgroundColor: 'red', color: 'white' } });
     }
   };
 
@@ -1917,19 +2071,16 @@ export default function IntegrationsPage() {
     }
 
     try {
-      setIsSaving(true);
       const response = await fetch('/api/linear/auth', {
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.email}`
         }
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to get authorization URL');
-      }
-
       const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
       
       if (data.url) {
         window.location.href = data.url;
@@ -1939,8 +2090,6 @@ export default function IntegrationsPage() {
     } catch (error) {
       console.error('Error connecting to Linear:', error);
       sonnerToast("Failed to connect to Linear", { style: { backgroundColor: 'red', color: 'white' } });
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -1948,24 +2097,34 @@ export default function IntegrationsPage() {
     if (!user?.email) return;
 
     try {
-      setIsSaving(true);
-      const stepData: Step = {
+      const db = getFirebaseDb();
+      const userDoc = await getDoc(doc(db, 'users', user.email));
+      const linearData = userDoc.data()?.linearIntegration;
+
+      if (!linearData?.accessToken) {
+        throw new Error('Linear not connected');
+      }
+
+      // Save automation step
+      const automationRef = doc(db, 'integratedautomations', user.email);
+      const automationsCollection = collection(automationRef, 'automations');
+      const linearAutomationRef = doc(automationsCollection, 'linear-integration');
+      
+      await setDoc(linearAutomationRef, {
         id: 'linear',
         type: 'linear',
-        title: 'Linear Integration',
         config: {
-          teamId: selectedTeam
-        }
-      };
+          teamId: linearData.selectedTeamId,
+          teamName: linearData.teams.find((t: { id: string; name: string }) => t.id === linearData.selectedTeamId)?.name
+        },
+        createdAt: new Date().toISOString()
+      });
 
-      setSteps(prev => [...prev, stepData]);
-      sonnerToast("Linear integration configured successfully", { style: { backgroundColor: 'green', color: 'white' } });
+      sonnerToast("Linear settings updated");
       setCurrentStep(null);
     } catch (error) {
       console.error('Error saving Linear config:', error);
-      sonnerToast("Failed to save Linear configuration", { style: { backgroundColor: 'red', color: 'white' } });
-    } finally {
-      setIsSaving(false);
+      sonnerToast("Failed to save settings");
     }
   };
 

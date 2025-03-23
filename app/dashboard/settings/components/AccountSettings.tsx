@@ -10,22 +10,12 @@ import SlackConnection from "../../integrations/components/SlackConnection"
 import NotionConnection from "../../integrations/components/NotionConnection"
 import LinearConnection from "../../integrations/components/LinearConnection"
 import HubSpotConnection from "../../integrations/components/HubSpotConnection"
-import SalesforceConnection from "../../integrations/components/SalesforceConnection"
 import { useAuth } from "@/context/auth-context"
 import { useState } from "react"
 
 export default function AccountSettings() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-
-  const handleSlackSave = async (config: any) => {
-    // This is handled internally by the SlackConnection component
-    return Promise.resolve();
-  };
-
-  const handleSlackCancel = () => {
-    // This is handled internally by the SlackConnection component
-  };
 
   return (
     <div className="space-y-6">
@@ -64,10 +54,9 @@ export default function AccountSettings() {
         
         <div className="space-y-4">
           <NotionConnection />
-          <SlackConnection onSave={handleSlackSave} onCancel={handleSlackCancel} />
+          <SlackConnection />
           <LinearConnection />
           <HubSpotConnection />
-          <SalesforceConnection />
         </div>
       </div>
     </div>
