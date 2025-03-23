@@ -10,6 +10,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slack } from "lucide-react";
 
 interface SlackChannel {
   id: string;
@@ -181,6 +182,37 @@ export default function SlackConnection({ onBack }: SlackConnectionProps) {
     }
   };
 
+  const handleDisconnect = async () => {
+    if (!user?.email) {
+      toast.error('Please sign in to disconnect Slack');
+      return;
+    }
+
+    try {
+      setIsConnecting(true);
+      const response = await fetch('/api/slack/disconnect', {
+        headers: {
+          'Authorization': `Bearer ${user.email}`
+        }
+      });
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      if (data.success) {
+        toast.success('Successfully disconnected from Slack');
+        setIsConnected(false);
+        setChannels([]);
+      }
+    } catch (error) {
+      console.error('Error disconnecting from Slack:', error);
+      toast.error('Failed to disconnect from Slack');
+      setIsConnecting(false);
+    }
+  };
+
   useEffect(() => {
     // Check for redirect from Slack OAuth
     const params = new URLSearchParams(window.location.search);
@@ -203,104 +235,93 @@ export default function SlackConnection({ onBack }: SlackConnectionProps) {
 
   if (isLoading) {
     return (
-      <div className="space-y-8">
-        <button onClick={onBack} className="flex items-center text-muted-foreground hover:text-foreground text-lg">
-          <ChevronLeft className="h-5 w-5 mr-2" />
-          Send notes to Slack
-        </button>
-        <div className="text-center text-muted-foreground">Loading...</div>
-      </div>
+      <div className="text-center text-muted-foreground">Loading...</div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <button onClick={onBack} className="flex items-center text-muted-foreground hover:text-foreground text-lg">
-        <ChevronLeft className="h-5 w-5 mr-2" />
-        Send notes to Slack
-      </button>
-
-      <div className="space-y-6 bg-card p-6 rounded-lg border border-border">
-        {!isConnected ? (
-          <div className="space-y-4">
-            <h2 className="text-lg font-medium">Connect to Slack</h2>
-            <p className="text-muted-foreground">
-              Connect your Slack workspace to send meeting notes and action items.
+    <div className="space-y-6 bg-card p-6 rounded-lg border border-border">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center">
+            <Slack className="h-5 w-5" />
+          </div>
+          <div>
+            <h4 className="text-sm font-medium">Slack</h4>
+            <p className="text-sm text-muted-foreground">
+              {isConnected ? "Connected" : "Not connected"}
             </p>
-            <Button onClick={handleConnect} disabled={isConnecting}>
-              {isConnecting ? 'Connecting...' : 'Connect Slack'}
-            </Button>
           </div>
-        ) : (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-medium mb-3">Channel</h2>
-              <p className="text-muted-foreground mb-4">
-                Select the Slack channel you'd like to send your notes to. To select a private channel, add
-                @DescriptAI to it first.
-              </p>
-              <Select 
-                value={selectedChannel}
-                onValueChange={setSelectedChannel}
-              >
-                <SelectTrigger className="w-[300px]">
-                  <SelectValue placeholder="Choose a channel..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {channels.map((channel) => (
-                    <SelectItem key={channel.id} value={channel.id}>
-                      #{channel.name}
-                      {channel.isPrivate && " (private)"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <h2 className="text-lg font-medium mb-3">What to include</h2>
-              <p className="text-muted-foreground mb-4">Choose what you'd like to send to Slack.</p>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="meeting-notes"
-                    checked={selectedOptions.meetingNotes}
-                    onCheckedChange={(checked) =>
-                      setSelectedOptions((prev) => ({ ...prev, meetingNotes: checked as boolean }))
-                    }
-                    className="h-5 w-5"
-                  />
-                  <label htmlFor="meeting-notes" className="text-base font-medium">
-                    Meeting notes
-                  </label>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="action-items"
-                    checked={selectedOptions.actionItems}
-                    onCheckedChange={(checked) =>
-                      setSelectedOptions((prev) => ({ ...prev, actionItems: checked as boolean }))
-                    }
-                    className="h-5 w-5"
-                  />
-                  <label htmlFor="action-items" className="text-base font-medium">
-                    Action items
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              onClick={handleSave}
-              className="mt-8 py-6 text-lg w-full"
-              size="lg"
-              disabled={!selectedChannel}
-            >
-              Done
-            </Button>
-          </div>
-        )}
+        </div>
+        <Button
+          onClick={isConnected ? handleDisconnect : handleConnect}
+          variant={isConnected ? "outline" : "default"}
+          disabled={isConnecting}
+          className="rounded-full"
+        >
+          {isConnecting ? "Connecting..." : isConnected ? "Disconnect" : "Connect"}
+        </Button>
       </div>
+
+      {!isConnected && (
+        <div className="text-sm text-muted-foreground">
+          Connect your Slack workspace to automatically send meeting notes and action items.
+        </div>
+      )}
+
+      {/* Keep the form elements but hide them when connected */}
+      {isConnected && (
+        <div className="hidden">
+          <Select 
+            value={selectedChannel}
+            onValueChange={setSelectedChannel}
+          >
+            <SelectTrigger className="w-[300px]">
+              <SelectValue placeholder="Choose a channel..." />
+            </SelectTrigger>
+            <SelectContent>
+              {channels.map((channel) => (
+                <SelectItem key={channel.id} value={channel.id}>
+                  #{channel.name}
+                  {channel.isPrivate && " (private)"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="meeting-notes"
+                checked={selectedOptions.meetingNotes}
+                onCheckedChange={(checked) =>
+                  setSelectedOptions((prev) => ({ ...prev, meetingNotes: checked as boolean }))
+                }
+                className="h-5 w-5"
+              />
+            </div>
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="action-items"
+                checked={selectedOptions.actionItems}
+                onCheckedChange={(checked) =>
+                  setSelectedOptions((prev) => ({ ...prev, actionItems: checked as boolean }))
+                }
+                className="h-5 w-5"
+              />
+            </div>
+          </div>
+
+          <Button
+            onClick={handleSave}
+            className="mt-8 py-6 text-lg w-full"
+            size="lg"
+            disabled={!selectedChannel}
+          >
+            Done
+          </Button>
+        </div>
+      )}
     </div>
   );
 } 

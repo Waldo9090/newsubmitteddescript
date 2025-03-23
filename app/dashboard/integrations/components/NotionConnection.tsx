@@ -395,13 +395,7 @@ export default function NotionConnection({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Connect Notion</CardTitle>
-        <CardDescription>
-          Connect your Notion workspace to export meeting notes and action items
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -419,74 +413,56 @@ export default function NotionConnection({
               onClick={isConnected ? handleDisconnect : handleConnect}
               variant={isConnected ? "outline" : "default"}
               disabled={isConnecting}
+              className="rounded-full"
             >
               {isConnecting ? "Connecting..." : isConnected ? "Disconnect" : "Connect"}
             </Button>
           </div>
 
+          {!isConnected && (
+            <div className="text-sm text-muted-foreground">
+              Connect your Notion workspace to automatically export meeting notes and action items.
+            </div>
+          )}
+
+          {/* Keep the hidden form elements for maintaining functionality */}
           {isConnected && (
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium mb-2">Select Page</h4>
-                <Select
-                  value={selectedPage}
-                  onValueChange={setSelectedPage}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a page..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pages.map(page => (
-                      <SelectItem key={page.id} value={page.id}>
-                        {page.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium">Export Options</h4>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <div className="text-sm">Meeting Notes</div>
-                    <div className="text-xs text-muted-foreground">
-                      Export meeting notes to Notion
-                    </div>
-                  </div>
-                  <Switch
-                    checked={exportOptions.notes}
-                    onCheckedChange={(checked) =>
-                      setExportOptions(prev => ({ ...prev, notes: checked }))
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <div className="text-sm">Action Items</div>
-                    <div className="text-xs text-muted-foreground">
-                      Export action items to Notion
-                    </div>
-                  </div>
-                  <Switch
-                    checked={exportOptions.actionItems}
-                    onCheckedChange={(checked) =>
-                      setExportOptions(prev => ({ ...prev, actionItems: checked }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3">
-                {onClose && (
-                  <Button variant="outline" onClick={onClose}>
-                    Cancel
-                  </Button>
-                )}
-                <Button onClick={handleSave}>
-                  Save
+            <div className="hidden">
+              <Select
+                value={selectedPage}
+                onValueChange={setSelectedPage}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a page..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {pages.map(page => (
+                    <SelectItem key={page.id} value={page.id}>
+                      {page.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Switch
+                checked={exportOptions.notes}
+                onCheckedChange={(checked) =>
+                  setExportOptions(prev => ({ ...prev, notes: checked }))
+                }
+              />
+              <Switch
+                checked={exportOptions.actionItems}
+                onCheckedChange={(checked) =>
+                  setExportOptions(prev => ({ ...prev, actionItems: checked }))
+                }
+              />
+              {onClose && (
+                <Button variant="outline" onClick={onClose}>
+                  Cancel
                 </Button>
-              </div>
+              )}
+              <Button onClick={handleSave}>
+                Save
+              </Button>
             </div>
           )}
         </div>

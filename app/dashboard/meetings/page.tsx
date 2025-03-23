@@ -13,6 +13,8 @@ import { collection, getDocs, query, getFirestore } from 'firebase/firestore'
 import { useSearch } from '@/src/context/search-context';
 import { useMeetings } from '@/src/context/meetings-context';
 import { format } from "date-fns"
+import { Plus } from "lucide-react"
+import RecordDialog from "@/app/dialogs/RecordDialog";
 
 // Dynamically import Lucide icons with no SSR
 const Calendar = dynamic(() => import('lucide-react').then(mod => mod.Calendar), { ssr: false });
@@ -75,6 +77,7 @@ export default function MeetingsPage() {
   const { searchQuery } = useSearch();
   const { refreshTrigger } = useMeetings();
   const [mounted, setMounted] = useState(false);
+  const [isRecordOpen, setIsRecordOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -224,6 +227,13 @@ export default function MeetingsPage() {
     <div className="w-full max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6 px-6">
         <h1 className="text-2xl font-semibold">Meetings</h1>
+        <Button 
+          onClick={() => setIsRecordOpen(true)}
+          className="rounded-full"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Meeting
+        </Button>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2 px-6">
@@ -231,7 +241,7 @@ export default function MeetingsPage() {
           variant={activeTag === null ? "default" : "outline"} 
           size="sm" 
           onClick={() => setActiveTag(null)}
-          className="transform transition-all hover:scale-105 active:scale-95"
+          className="rounded-full transform transition-all hover:scale-105 active:scale-95"
         >
           All
         </Button>
@@ -241,7 +251,7 @@ export default function MeetingsPage() {
             variant={activeTag === tag ? "default" : "outline"}
             size="sm"
             onClick={() => setActiveTag(tag)}
-            className="transform transition-all hover:scale-105 active:scale-95"
+            className="rounded-full transform transition-all hover:scale-105 active:scale-95"
           >
             {tag}
           </Button>
@@ -282,7 +292,11 @@ export default function MeetingsPage() {
               </div>
               <div className="flex gap-2 flex-shrink-0 ml-4">
                 {meeting.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="transform transition-all hover:scale-105">
+                  <Badge 
+                    key={tag} 
+                    variant="secondary" 
+                    className="rounded-full transform transition-all hover:scale-105"
+                  >
                     {tag}
                   </Badge>
                 ))}
@@ -299,6 +313,11 @@ export default function MeetingsPage() {
     </div>
   );
 
-  return content;
+  return (
+    <>
+      {content}
+      <RecordDialog open={isRecordOpen} onOpenChange={setIsRecordOpen} />
+    </>
+  );
 }
 

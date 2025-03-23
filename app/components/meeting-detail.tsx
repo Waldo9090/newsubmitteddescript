@@ -693,48 +693,16 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
         {/* Header with Action Buttons */}
         <div className="sticky top-0 bg-white dark:bg-slate-900 z-10 p-4 border-b flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={onClose} className="mr-2 flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={onClose} className="mr-2 flex items-center gap-1 rounded-full">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
             <h2 className="text-xl font-semibold truncate">{meeting.title || meeting.name}</h2>
           </div>
           <div className="flex items-center space-x-2">
-            {/* Attio Sync Button */}
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={syncWithAttio}
-              disabled={isSyncingAttio}
-              className={cn(
-                "flex items-center gap-1",
-                attioSyncStatus === 'success' && "border-green-500 text-green-500",
-                attioSyncStatus === 'error' && "border-red-500 text-red-500",
-                attioSyncStatus === 'not-connected' && "border-amber-500 text-amber-500"
-              )}
-            >
-              {isSyncingAttio ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  {attioSyncStatus === 'success' ? <Check className="h-4 w-4" /> : 
-                   attioSyncStatus === 'error' ? <FileX className="h-4 w-4" /> :
-                   attioSyncStatus === 'not-connected' ? <User className="h-4 w-4" /> :
-                   <User className="h-4 w-4" />}
-                  Sync to Attio
-                </>
-              )}
-            </Button>
-            
             <Button 
               variant="outline" 
               onClick={handleCopyNotes}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 rounded-full"
             >
               {copied ? (
                 <>
@@ -749,10 +717,9 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
               )}
             </Button>
             
-            {/* Existing dropdown menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" className="rounded-full">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -796,7 +763,7 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
                     {tag}
                   </Badge>
                 ))}
-                <Button variant="outline" size="sm" onClick={() => setShowTagSelector(true)}>
+                <Button variant="outline" size="sm" onClick={() => setShowTagSelector(true)} className="rounded-full">
                   Add Tag
                 </Button>
               </div>
@@ -854,7 +821,7 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
                           <Badge 
                             key={tag} 
                             variant="secondary"
-                            className="flex items-center gap-1 py-1 px-3"
+                            className="flex items-center gap-1 py-1 px-3 rounded-full"
                           >
                             {tag}
                             <button
@@ -873,7 +840,7 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
                   </div>
 
                   <div className="flex gap-2 pt-2 border-t">
-                    <Button size="sm" onClick={handleSaveTags}>Save Changes</Button>
+                    <Button size="sm" onClick={handleSaveTags} className="rounded-full">Save Changes</Button>
                     <Button 
                       size="sm" 
                       variant="outline" 
@@ -881,6 +848,7 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
                         setShowTagSelector(false);
                         setSelectedTags(meeting.tags);
                       }}
+                      className="rounded-full"
                     >
                       Cancel
                     </Button>
@@ -893,7 +861,7 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
             <div className="flex-none p-6 border-b">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Action Items</h3>
-                <Button onClick={() => setShowCreateActionItem(true)} variant="outline" size="sm">
+                <Button onClick={() => setShowCreateActionItem(true)} variant="outline" size="sm" className="rounded-full">
                   <Plus className="h-4 w-4 mr-2" />
                   Create Action Item
                 </Button>
@@ -1047,16 +1015,60 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold">Notes</h3>
-                        <Button variant="outline" size="sm" onClick={handleCopyNotes}>
+                        <Button variant="outline" size="sm" onClick={handleCopyNotes} className="rounded-full">
                           Copy Notes
                         </Button>
                       </div>
-                      <Textarea
-                        value={meeting.notes || ''}
-                        onChange={(e) => handleUpdateNotes(e.target.value)}
-                        className="min-h-[200px]"
-                        placeholder="No notes available"
-                      />
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={editedNotes}
+                            onChange={(e) => setEditedNotes(e.target.value)}
+                            className="min-h-[400px] font-mono text-sm"
+                            placeholder="No notes available"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setIsEditing(false);
+                                setEditedNotes(meeting.notes);
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                await handleUpdateNotes(editedNotes);
+                                setIsEditing(false);
+                              }}
+                            >
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <div className="prose prose-sm dark:prose-invert max-w-none border rounded-lg p-4 bg-card">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {meeting.notes || 'No notes available'}
+                            </ReactMarkdown>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 rounded-full"
+                            onClick={() => {
+                              setIsEditing(true);
+                              setEditedNotes(meeting.notes);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </TabsContent>
@@ -1098,8 +1110,8 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex flex-col sm:flex-row gap-3 sm:gap-0">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={connectToAttio} className="bg-blue-600 hover:bg-blue-700">
+            <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={connectToAttio} className="bg-blue-600 hover:bg-blue-700 rounded-full">
               Connect to Attio
             </AlertDialogAction>
             <Button 
@@ -1108,6 +1120,7 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
                 window.location.href = '/dashboard/settings?tab=account';
                 setShowAttioConnectDialog(false);
               }}
+              className="rounded-full"
             >
               Go to Integrations Settings
             </Button>

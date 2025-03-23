@@ -10,6 +10,9 @@ import { doc, getDoc, collection, getDocs, updateDoc } from "firebase/firestore"
 import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 
 interface Automation {
   id: string;
@@ -17,6 +20,13 @@ interface Automation {
   steps: {
     [key: string]: any;
   };
+}
+
+interface NotionPage {
+  id: string;
+  title: string;
+  icon?: string;
+  type: 'page' | 'database';
 }
 
 export default function AutomationDetailsPage() {
@@ -27,7 +37,23 @@ export default function AutomationDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [editingStep, setEditingStep] = useState<string | null>(null)
   const [availableTags, setAvailableTags] = useState<string[]>([])
+  const [channels, setChannels] = useState<Array<{ id: string; name: string; isPrivate?: boolean }>>([])
+  const [notionPages, setNotionPages] = useState<NotionPage[]>([])
   const { toast } = useToast()
+
+  // Add states for Slack preferences
+  const [selectedChannel, setSelectedChannel] = useState("")
+  const [slackOptions, setSlackOptions] = useState({
+    sendNotes: true,
+    sendActionItems: true
+  })
+
+  // Add states for Notion preferences
+  const [selectedPage, setSelectedPage] = useState("")
+  const [notionOptions, setNotionOptions] = useState({
+    exportNotes: true,
+    exportActionItems: true
+  })
 
   useEffect(() => {
     const fetchAutomation = async () => {
@@ -73,6 +99,35 @@ export default function AutomationDetailsPage() {
           const tags = tagsDocSnap.data().tags || []
           setAvailableTags(tags)
         }
+
+        // Fetch Slack channels if needed
+        const userDoc = await getDoc(doc(db, 'users', user.email))
+        const slackIntegration = userDoc.data()?.slackIntegration
+        if (slackIntegration?.accessToken) {
+          const response = await fetch('/api/slack/channels', {
+            headers: {
+              'Authorization': `Bearer ${user.email}`
+            }
+          })
+          const data = await response.json()
+          if (data.channels) {
+            setChannels(data.channels)
+          }
+        }
+
+        // Fetch Notion pages if needed
+        const notionIntegration = userDoc.data()?.notionIntegration
+        if (notionIntegration?.accessToken) {
+          const response = await fetch('/api/notion/pages', {
+            headers: {
+              'Authorization': `Bearer ${user.email}`
+            }
+          })
+          const data = await response.json()
+          if (data.pages) {
+            setNotionPages(data.pages)
+          }
+        }
       } catch (error) {
         console.error('Error fetching automation:', error)
         toast({
@@ -116,6 +171,9 @@ export default function AutomationDetailsPage() {
         title: "Success",
         description: "Step updated successfully"
       });
+      
+      // Reset editing state
+      setEditingStep(null);
     } catch (error) {
       console.error('Error updating step:', error);
       toast({
@@ -162,6 +220,188 @@ export default function AutomationDetailsPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (step.type === 'slack' && isEditing) {
+      // Set initial values when editing starts
+      useEffect(() => {
+        if (isEditing && step.type === 'slack') {
+          setSelectedChannel(step.channelId || "")
+          setSlackOptions({
+            sendNotes: step.sendNotes ?? true,
+            sendActionItems: step.sendActionItems ?? true
+          })
+        }
+      }, [isEditing])
+
+      return (
+        <div className="space-y-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Image src="/icons/integrations/slack.svg" alt="Slack" width={24} height={24} />
+              <h2 className="text-xl font-medium">Send notes to Slack</h2>
+            </div>
+            <Button variant="ghost" onClick={() => setEditingStep(null)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-3">Channel</h3>
+              <p className="text-muted-foreground mb-4">
+                Select the Slack channel you'd like to send your notes to. To select a private channel, add
+                @DescriptAI to it first.
+              </p>
+              <Select 
+                value={selectedChannel}
+                onValueChange={setSelectedChannel}
+              >
+                <SelectTrigger className="w-[300px]">
+                  <SelectValue placeholder="Choose a channel..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {channels.map((channel) => (
+                    <SelectItem key={channel.id} value={channel.id}>
+                      #{channel.name}
+                      {channel.isPrivate && " (private)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-medium mb-3">What to include</h3>
+              <p className="text-muted-foreground mb-4">Choose what you'd like to send to Slack.</p>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id="send-notes"
+                    checked={slackOptions.sendNotes}
+                    onCheckedChange={(checked) =>
+                      setSlackOptions(prev => ({ ...prev, sendNotes: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="send-notes">Meeting notes</Label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id="send-action-items"
+                    checked={slackOptions.sendActionItems}
+                    onCheckedChange={(checked) =>
+                      setSlackOptions(prev => ({ ...prev, sendActionItems: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="send-action-items">Action items</Label>
+                </div>
+              </div>
+            </div>
+
+            <Button 
+              onClick={() => handleStepUpdate(stepId, {
+                channelId: selectedChannel,
+                channelName: channels.find(c => c.id === selectedChannel)?.name,
+                sendNotes: slackOptions.sendNotes,
+                sendActionItems: slackOptions.sendActionItems
+              })}
+              className="w-full"
+            >
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (step.type === 'notion' && isEditing) {
+      // Set initial values when editing starts
+      useEffect(() => {
+        if (isEditing && step.type === 'notion') {
+          setSelectedPage(step.pageId || "")
+          setNotionOptions({
+            exportNotes: step.exportNotes ?? true,
+            exportActionItems: step.exportActionItems ?? true
+          })
+        }
+      }, [isEditing])
+
+      return (
+        <div className="space-y-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Image src="/icons/integrations/notion.svg" alt="Notion" width={24} height={24} />
+              <h2 className="text-xl font-medium">Export to Notion</h2>
+            </div>
+            <Button variant="ghost" onClick={() => setEditingStep(null)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-3">Select Page</h3>
+              <p className="text-muted-foreground mb-4">
+                Choose where to export your meeting content
+              </p>
+              <Select 
+                value={selectedPage}
+                onValueChange={setSelectedPage}
+              >
+                <SelectTrigger className="w-[300px]">
+                  <SelectValue placeholder="Select a page" />
+                </SelectTrigger>
+                <SelectContent>
+                  {notionPages.map((page) => (
+                    <SelectItem key={page.id} value={page.id}>
+                      {page.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-medium mb-3">What to include</h3>
+              <p className="text-muted-foreground mb-4">Choose what you'd like to export to Notion</p>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id="export-notes"
+                    checked={notionOptions.exportNotes}
+                    onCheckedChange={(checked) =>
+                      setNotionOptions(prev => ({ ...prev, exportNotes: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="export-notes">Meeting notes</Label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id="export-action-items"
+                    checked={notionOptions.exportActionItems}
+                    onCheckedChange={(checked) =>
+                      setNotionOptions(prev => ({ ...prev, exportActionItems: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="export-action-items">Action items</Label>
+                </div>
+              </div>
+            </div>
+
+            <Button 
+              onClick={() => handleStepUpdate(stepId, {
+                pageId: selectedPage,
+                pageTitle: notionPages.find(p => p.id === selectedPage)?.title,
+                exportNotes: notionOptions.exportNotes,
+                exportActionItems: notionOptions.exportActionItems
+              })}
+              className="w-full"
+            >
+              Save Changes
+            </Button>
           </div>
         </div>
       );

@@ -8,10 +8,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ChevronRight, ChevronLeft, Zap, Share2, Webhook, Tag, Info, X, Plus } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import Image from "next/image"
-import SlackConnection from "./components/SlackConnection"
-import NotionConnection from "./components/NotionConnection"
-import LinearConnection from "./components/LinearConnection"
-import AttioConnection from "./components/AttioConnection"
+//import SlackConnection from "./components/SlackConnection"
+//import NotionConnection from "./components/NotionConnection"
+//import LinearConnection from "./components/LinearConnection"
+//import AttioConnection from "./components/AttioConnection"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { getFirebaseDb } from "@/lib/firebase"
@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation"
 import { Switch } from "@/components/ui/switch"
 import { toast as sonnerToast } from "sonner"
 import { Label } from "@/components/ui/label"
+import { usePathname } from "next/navigation"
 
 interface StepConfig {
   tags?: string[];
@@ -271,6 +272,7 @@ export default function IntegrationsPage() {
   const [selectedTeam, setSelectedTeam] = useState("");
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const fetchTags = async () => {
@@ -294,50 +296,64 @@ export default function IntegrationsPage() {
     fetchTags();
   }, [user?.email]);
 
-  useEffect(() => {
-    const fetchSavedAutomations = async () => {
-      if (!user?.email) return;
+  const fetchSavedAutomations = async () => {
+    if (!user?.email) return;
 
-      try {
-        const db = getFirebaseDb();
+    try {
+      const db = getFirebaseDb();
+      
+      // First, ensure the user's document exists in integratedautomations
+      const userAutomationsRef = doc(db, 'integratedautomations', user.email);
+      
+      // Create the automations subcollection reference
+      const automationsCollectionRef = collection(userAutomationsRef, 'automations');
+      
+      // Get all automation documents
+      const automationsSnap = await getDocs(automationsCollectionRef);
+      
+      const automations: SavedAutomation[] = [];
+      
+      for (const automationDoc of automationsSnap.docs) {
+        // Get the steps subcollection for this automation
+        const stepsCollectionRef = collection(automationDoc.ref, 'steps');
+        const stepsSnap = await getDocs(stepsCollectionRef);
         
-        // First, ensure the user's document exists in integratedautomations
-        const userAutomationsRef = doc(db, 'integratedautomations', user.email);
-        
-        // Create the automations subcollection reference
-        const automationsCollectionRef = collection(userAutomationsRef, 'automations');
-        
-        // Get all automation documents
-        const automationsSnap = await getDocs(automationsCollectionRef);
-        
-        const automations: SavedAutomation[] = [];
-        
-        for (const automationDoc of automationsSnap.docs) {
-          // Get the steps subcollection for this automation
-          const stepsCollectionRef = collection(automationDoc.ref, 'steps');
-          const stepsSnap = await getDocs(stepsCollectionRef);
-          
-          const steps: { [key: string]: any } = {};
-          stepsSnap.forEach(stepDoc => {
-            steps[stepDoc.id] = stepDoc.data();
-          });
+        const steps: { [key: string]: any } = {};
+        stepsSnap.forEach(stepDoc => {
+          steps[stepDoc.id] = stepDoc.data();
+        });
 
-          automations.push({
-            id: automationDoc.id,
-            name: automationDoc.data().name || automationDoc.id,
-            steps: steps
-          });
-        }
-
-        console.log('Fetched automations:', automations);
-        setSavedAutomations(automations);
-      } catch (error) {
-        console.error('Error fetching automations:', error);
-        // Don't show error toast here as this might be the first time loading
-        // when no automations exist yet
+        automations.push({
+          id: automationDoc.id,
+          name: automationDoc.data().name || automationDoc.id,
+          steps: steps
+        });
       }
-    };
 
+      console.log('Fetched automations:', automations);
+      setSavedAutomations(automations);
+    } catch (error) {
+      console.error('Error fetching automations:', error);
+    }
+  };
+
+  // Add effect to check URL params and refresh
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const justCreated = url.searchParams.get('automation_created');
+    
+    if (justCreated === 'true') {
+      console.log('Automation just created, refreshing saved automations');
+      fetchSavedAutomations();
+      
+      // Remove the query param
+      url.searchParams.delete('automation_created');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, []);
+
+  // Initial fetch of saved automations
+  useEffect(() => {
     fetchSavedAutomations();
   }, [user?.email]);
 
@@ -1799,8 +1815,8 @@ export default function IntegrationsPage() {
       setSelectedTags([]);
       setAutomationName("");
       
-      // Navigate back to the main integrations page
-      router.push('/dashboard/integrations');
+      // Navigate back to the main integrations page with the created parameter
+      router.push('/dashboard/integrations?automation_created=true');
     } catch (error) {
       console.error('Error saving automation:', error, {
         errorDetails: error instanceof Error ? error.message : 'Unknown error',

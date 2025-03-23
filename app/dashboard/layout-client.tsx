@@ -219,11 +219,21 @@ export default function DashboardLayout({
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                      <Link href="/" className="flex items-center">
+                    <DropdownMenuItem asChild>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await signOut();
+                            window.location.href = '/';
+                          } catch (error) {
+                            console.error('Error signing out:', error);
+                          }
+                        }}
+                        className="w-full flex items-center"
+                      >
                         <LogOut className="mr-2 h-4 w-4" />
                         <span>Sign out</span>
-                      </Link>
+                      </button>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -249,7 +259,7 @@ export default function DashboardLayout({
                   <div className="absolute right-6">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
                           <PlusCircle className="mr-2 h-4 w-4" />
                           New meeting
                         </Button>
