@@ -47,6 +47,7 @@ export default function NotionConnection({
   forceStatus
 }: NotionConnectionProps) {
   const { user } = useAuth();
+  const [mounted, setMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -58,6 +59,10 @@ export default function NotionConnection({
     notes: true,
     actionItems: true
   });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     // Handle search params for OAuth callback
@@ -383,12 +388,21 @@ export default function NotionConnection({
     }
   };
 
-  if (isLoading) {
+  if (!mounted) {
     return (
       <Card>
-        <CardContent className="pt-6">
-          <div className="text-center text-muted-foreground">Loading...</div>
-        </CardContent>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded bg-muted animate-pulse" />
+              <div className="space-y-2">
+                <div className="h-5 w-24 bg-muted rounded animate-pulse" />
+                <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+              </div>
+            </div>
+            <div className="h-9 w-24 bg-muted rounded animate-pulse" />
+          </div>
+        </CardHeader>
       </Card>
     );
   }

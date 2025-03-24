@@ -34,12 +34,6 @@ interface TranscriptData {
   transcript: string;
 }
 
-interface HubSpotConfig {
-  contacts: boolean;
-  deals: boolean;
-  includeMeetingNotes: boolean;
-  includeActionItems: boolean;
-}
 
 interface AutomationStep {
   type: string;

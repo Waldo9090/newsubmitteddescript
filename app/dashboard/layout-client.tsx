@@ -242,24 +242,26 @@ export default function DashboardLayout({
 
             <div className="flex flex-col flex-1 overflow-hidden">
               <header className="fixed top-0 right-0 left-[240px] h-16 border-b border-border bg-background z-50">
-                <div className="absolute inset-0 flex items-center">
-                  <SidebarTrigger className="absolute left-6" />
-                  <div className="absolute left-[88px] right-[180px]">
-                    <div className="relative w-full">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      <Input
-                        type="text"
-                        placeholder="Search or ask a question..."
-                        className="pl-8 w-full pr-4"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
+                <div className="absolute inset-0 flex items-center px-6">
+                  <div className="flex items-center flex-1">
+                    <SidebarTrigger />
+                    <div className="ml-[24px] w-full max-w-2xl">
+                      <div className="relative w-full">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          type="text"
+                          placeholder="Search or ask a question..."
+                          className="pl-8 w-full pr-4"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div className="absolute right-6">
+                  <div className="fixed top-4 right-6 z-50">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
+                        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full shadow-lg">
                           <PlusCircle className="mr-2 h-4 w-4" />
                           New meeting
                         </Button>

@@ -7,20 +7,17 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import dynamic from 'next/dynamic';
 import { useAuth } from '@/context/auth-context'
 import { collection, getDocs, query, getFirestore } from 'firebase/firestore'
 import { useSearch } from '@/src/context/search-context';
 import { useMeetings } from '@/src/context/meetings-context';
 import { format } from "date-fns"
-import { Plus } from "lucide-react"
-import RecordDialog from "@/app/dialogs/RecordDialog";
+import dynamic from 'next/dynamic'
 
-// Dynamically import Lucide icons with no SSR
-const Calendar = dynamic(() => import('lucide-react').then(mod => mod.Calendar), { ssr: false });
-const Clock = dynamic(() => import('lucide-react').then(mod => mod.Clock), { ssr: false });
-const Users = dynamic(() => import('lucide-react').then(mod => mod.Users), { ssr: false });
-const Search = dynamic(() => import('lucide-react').then(mod => mod.Search), { ssr: false });
+// Dynamically import icons with ssr disabled
+const Calendar = dynamic(async () => (await import('lucide-react')).Calendar, { ssr: false })
+const Clock = dynamic(async () => (await import('lucide-react')).Clock, { ssr: false })
+const Users = dynamic(async () => (await import('lucide-react')).Users, { ssr: false })
 
 interface ActionItem {
   text: string;
@@ -70,19 +67,21 @@ interface Meeting {
 
 export default function MeetingsPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [meetings, setMeetings] = useState<Meeting[]>([])
-  const [loading, setLoading] = useState(true)
-  const [activeTag, setActiveTag] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
   const { searchQuery } = useSearch();
   const { refreshTrigger } = useMeetings();
-  const [mounted, setMounted] = useState(false);
-  const [isRecordOpen, setIsRecordOpen] = useState(false);
+  const auth = useAuth();
 
   useEffect(() => {
     setMounted(true);
-    console.log("Component mounted");
-  }, []);
+    if (auth.user) {
+      setUser(auth.user);
+    }
+  }, [auth.user]);
 
   useEffect(() => {
     console.log("refreshTrigger changed:", refreshTrigger);
@@ -160,7 +159,7 @@ export default function MeetingsPage() {
     }
   }, [mounted, user?.email, fetchMeetings, refreshTrigger]);
 
-  if (!mounted || loading) {
+  if (!mounted) {
     return (
       <div className="p-6 w-full">
         <div className="animate-pulse">
@@ -227,13 +226,6 @@ export default function MeetingsPage() {
     <div className="w-full max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6 px-6">
         <h1 className="text-2xl font-semibold">Meetings</h1>
-        <Button 
-          onClick={() => setIsRecordOpen(true)}
-          className="rounded-full"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Meeting
-        </Button>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2 px-6">
@@ -266,7 +258,7 @@ export default function MeetingsPage() {
             onClick={() => handleMeetingClick(meeting)}
           >
             <div className="flex items-center justify-between w-full">
-              <div className="flex items-start space-x-4 min-w-0">
+              <div className="flex items-start space-x-4 min-w-0 flex-1">
                 <span className="text-2xl flex-shrink-0 transform transition-all hover:scale-110">{meeting.emoji}</span>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-lg truncate">{meeting.title}</h3>
@@ -290,7 +282,7 @@ export default function MeetingsPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex gap-2 flex-shrink-0 ml-4">
+              <div className="flex gap-2 flex-shrink-0 ml-auto">
                 {meeting.tags.map((tag) => (
                   <Badge 
                     key={tag} 
@@ -316,7 +308,6 @@ export default function MeetingsPage() {
   return (
     <>
       {content}
-      <RecordDialog open={isRecordOpen} onOpenChange={setIsRecordOpen} />
     </>
   );
 }

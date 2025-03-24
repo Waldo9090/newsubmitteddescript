@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, ArrowRight } from "lucide-react";
+import { PlusCircle, ArrowRight, Pencil } from "lucide-react";
 import AutomationForms from "./AutomationForms";
 import { integrationIcons } from "@/app/lib/integration-icons";
 
@@ -87,8 +87,8 @@ export default function CreateAutomation() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div className="flex-1">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div className="flex items-center gap-4">
           {isEditing ? (
             <Input
               value={title}
@@ -96,20 +96,26 @@ export default function CreateAutomation() {
               onBlur={() => setIsEditing(false)}
               onKeyDown={(e) => e.key === "Enter" && setIsEditing(false)}
               autoFocus
+              className="h-8 text-base font-medium bg-transparent focus-visible:ring-1"
+              style={{ width: Math.max(200, title.length * 8) + 'px' }}
             />
           ) : (
-            <CardTitle className="cursor-pointer hover:opacity-70" onClick={() => setIsEditing(true)}>
-              {title}
-            </CardTitle>
+            <div 
+              className="flex items-center gap-2 group cursor-pointer" 
+              onClick={() => setIsEditing(true)}
+            >
+              <h2 className="text-base font-medium">{title}</h2>
+              <Pencil className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
+            </div>
           )}
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setStep("initial")}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={!selectedAction}>
-            Save
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setStep("initial")}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={!selectedAction}>
+              Create
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">

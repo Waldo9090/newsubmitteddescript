@@ -13,6 +13,7 @@ import Image from "next/image"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface Automation {
   id: string;
@@ -29,11 +30,54 @@ interface NotionPage {
   type: 'page' | 'database';
 }
 
+interface Step {
+  id: string;
+  type: string;
+  name?: string;
+  config?: any;
+}
+
+interface SavedAutomation {
+  id: string;
+  name: string;
+  steps: Step[];
+  createdAt: number;
+}
+
+const integrationIcons: Record<string, { name: string; iconUrl: string; color: string }> = {
+  "ai-insights": {
+    name: "Generate insights with AI",
+    iconUrl: "/icons/integrations/ai-insights.svg",
+    color: "text-purple-500",
+  },
+  "slack": {
+    name: "Send notes to Slack",
+    iconUrl: "/icons/integrations/slack.svg",
+    color: "text-green-500",
+  },
+  "notion": {
+    name: "Update Notion",
+    iconUrl: "/icons/integrations/notion.svg",
+    color: "text-gray-900 dark:text-gray-100",
+  },
+  "linear": {
+    name: "Create Linear tasks",
+    iconUrl: "/icons/integrations/linear.svg",
+    color: "text-blue-500",
+  },
+  "hubspot": {
+    name: "Update HubSpot",
+    iconUrl: "/icons/integrations/hubspot.svg",
+    color: "#ff7a59",
+  },
+};
+
 export default function AutomationDetailsPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
   const { user } = useAuth()
-  const [automation, setAutomation] = useState<Automation | null>(null)
+  const [mounted, setMounted] = useState(false)
+  const [automation, setAutomation] = useState<SavedAutomation | null>(null)
   const [loading, setLoading] = useState(true)
   const [editingStep, setEditingStep] = useState<string | null>(null)
   const [availableTags, setAvailableTags] = useState<string[]>([])
@@ -54,6 +98,10 @@ export default function AutomationDetailsPage() {
     exportNotes: true,
     exportActionItems: true
   })
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const fetchAutomation = async () => {
@@ -80,15 +128,21 @@ export default function AutomationDetailsPage() {
         const stepsRef = collection(automationRef, 'steps')
         const stepsSnap = await getDocs(stepsRef)
         
-        const steps: { [key: string]: any } = {}
+        const steps: Step[] = []
         stepsSnap.forEach(stepDoc => {
-          steps[stepDoc.id] = stepDoc.data()
+          steps.push({
+            id: stepDoc.id,
+            type: stepDoc.data().type || 'unknown',
+            name: stepDoc.data().name,
+            config: stepDoc.data().config || {}
+          })
         })
         
         setAutomation({
           id: automationDoc.id,
-          name: automationDoc.data().name || automationDoc.id,
-          steps
+          name: automationDoc.data().name || 'Untitled Integration',
+          steps,
+          createdAt: automationDoc.data().createdAt?.seconds * 1000 || Date.now(),
         })
         
         // Fetch available tags for step editing
@@ -157,13 +211,9 @@ export default function AutomationDetailsPage() {
         
         return {
           ...prev,
-          steps: {
-            ...prev.steps,
-            [stepId]: {
-              ...prev.steps[stepId],
-              ...updatedData
-            }
-          }
+          steps: prev.steps.map(step =>
+            step.id === stepId ? { ...step, ...updatedData } : step
+          )
         };
       });
 
@@ -184,7 +234,7 @@ export default function AutomationDetailsPage() {
   };
 
   // Function to render step details
-  const renderStepDetails = (stepId: string, step: any) => {
+  const renderStepDetails = (stepId: string, step: Step) => {
     const isEditing = editingStep === stepId;
 
     if (step.type === 'trigger' && isEditing) {
@@ -203,7 +253,7 @@ export default function AutomationDetailsPage() {
           <div>
             <h3 className="text-lg font-medium mb-4">When to run</h3>
             <div className="bg-muted/30 p-6 rounded-lg space-y-4">
-              {step.tags?.map((tag: string, index: number) => (
+              {step.config?.tags?.map((tag: string, index: number) => (
                 <div key={index} className="flex items-center gap-2">
                   <span>{tag}</span>
                   <Button 
@@ -211,8 +261,8 @@ export default function AutomationDetailsPage() {
                     size="sm" 
                     className="p-0 h-auto"
                     onClick={() => {
-                      const newTags = step.tags.filter((_: string, i: number) => i !== index);
-                      handleStepUpdate(stepId, { tags: newTags });
+                      const newTags = step.config?.tags.filter((_: string, i: number) => i !== index);
+                      handleStepUpdate(stepId, { config: { ...step.config, tags: newTags } });
                     }}
                   >
                     <X className="h-4 w-4" />
@@ -229,10 +279,10 @@ export default function AutomationDetailsPage() {
       // Set initial values when editing starts
       useEffect(() => {
         if (isEditing && step.type === 'slack') {
-          setSelectedChannel(step.channelId || "")
+          setSelectedChannel(step.config?.channelId || "")
           setSlackOptions({
-            sendNotes: step.sendNotes ?? true,
-            sendActionItems: step.sendActionItems ?? true
+            sendNotes: step.config?.sendNotes ?? true,
+            sendActionItems: step.config?.sendActionItems ?? true
           })
         }
       }, [isEditing])
@@ -303,10 +353,13 @@ export default function AutomationDetailsPage() {
 
             <Button 
               onClick={() => handleStepUpdate(stepId, {
-                channelId: selectedChannel,
-                channelName: channels.find(c => c.id === selectedChannel)?.name,
-                sendNotes: slackOptions.sendNotes,
-                sendActionItems: slackOptions.sendActionItems
+                config: {
+                  ...step.config,
+                  channelId: selectedChannel,
+                  channelName: channels.find(c => c.id === selectedChannel)?.name,
+                  sendNotes: slackOptions.sendNotes,
+                  sendActionItems: slackOptions.sendActionItems
+                }
               })}
               className="w-full"
             >
@@ -321,10 +374,10 @@ export default function AutomationDetailsPage() {
       // Set initial values when editing starts
       useEffect(() => {
         if (isEditing && step.type === 'notion') {
-          setSelectedPage(step.pageId || "")
+          setSelectedPage(step.config?.pageId || "")
           setNotionOptions({
-            exportNotes: step.exportNotes ?? true,
-            exportActionItems: step.exportActionItems ?? true
+            exportNotes: step.config?.exportNotes ?? true,
+            exportActionItems: step.config?.exportActionItems ?? true
           })
         }
       }, [isEditing])
@@ -393,10 +446,13 @@ export default function AutomationDetailsPage() {
 
             <Button 
               onClick={() => handleStepUpdate(stepId, {
-                pageId: selectedPage,
-                pageTitle: notionPages.find(p => p.id === selectedPage)?.title,
-                exportNotes: notionOptions.exportNotes,
-                exportActionItems: notionOptions.exportActionItems
+                config: {
+                  ...step.config,
+                  pageId: selectedPage,
+                  pageTitle: notionPages.find(p => p.id === selectedPage)?.title,
+                  exportNotes: notionOptions.exportNotes,
+                  exportActionItems: notionOptions.exportActionItems
+                }
               })}
               className="w-full"
             >
@@ -422,17 +478,20 @@ export default function AutomationDetailsPage() {
           {step.type === 'ai-insights' && <Image src="/icons/integrations/ai-insights.svg" alt="AI Insights" width={24} height={24} />}
         </div>
         <span className="font-medium text-lg">
-          {step.type === 'trigger' && `After every meeting with tags: ${step.tags?.join(", ") || "any"}`}
+          {step.type === 'trigger' && `After every meeting with tags: ${step.config?.tags?.join(", ") || "any"}`}
           {step.type === 'slack' && "Send notes to Slack"}
           {step.type === 'notion' && "Update Notion"}
           {step.type === 'linear' && "Create Linear tasks"}
-          {step.type === 'attio' && "Sync with Attio"}
-          {step.type === 'ai-insights' && step.name}
+          {step.type === 'attio' && step.name}
         </span>
         <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" />
       </div>
     );
   };
+
+  if (!mounted) {
+    return null // Prevent hydration mismatch by not rendering anything on server
+  }
 
   if (loading) {
     return (
@@ -485,13 +544,11 @@ export default function AutomationDetailsPage() {
         <div className="space-y-6">
           <h2 className="text-xl font-medium mb-4">Steps</h2>
           <div className="space-y-4">
-            {Object.entries(automation.steps)
-              .sort(([a], [b]) => Number(a) - Number(b))
-              .map(([stepId, step]) => (
-                <div key={stepId} className="mb-6">
-                  {renderStepDetails(stepId, step)}
-                </div>
-              ))}
+            {automation.steps.map((step) => (
+              <div key={step.id} className="mb-6">
+                {renderStepDetails(step.id, step)}
+              </div>
+            ))}
           </div>
         </div>
       </div>

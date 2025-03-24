@@ -8,10 +8,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ChevronRight, ChevronLeft, Zap, Share2, Webhook, Tag, Info, X, Plus } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import Image from "next/image"
-//import SlackConnection from "./components/SlackConnection"
-//import NotionConnection from "./components/NotionConnection"
-//import LinearConnection from "./components/LinearConnection"
-//import AttioConnection from "./components/AttioConnection"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { getFirebaseDb } from "@/lib/firebase"
@@ -20,7 +16,6 @@ import { useAuth } from "@/context/auth-context"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
-import React from "react"
 import { useRouter } from "next/navigation"
 import { Switch } from "@/components/ui/switch"
 import { toast as sonnerToast } from "sonner"
@@ -250,6 +245,7 @@ const renderIcon = (integration: IntegrationIcon | undefined) => {
 };
 
 export default function IntegrationsPage() {
+  const [mounted, setMounted] = useState(false);
   const [isCreating, setIsCreating] = useState(false)
   const [automationName, setAutomationName] = useState("Untitled Integration")
   const [currentStep, setCurrentStep] = useState<StepType>(null)
@@ -298,6 +294,10 @@ export default function IntegrationsPage() {
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const fetchTags = async () => {
@@ -989,6 +989,30 @@ export default function IntegrationsPage() {
     }
   }, []);
 
+  if (!mounted) {
+    return (
+      <DashboardLayout>
+        <div className="p-6 max-w-7xl mx-auto">
+          <h1 className="text-2xl font-semibold mb-6">Integrations</h1>
+          <div className="animate-pulse space-y-6">
+            <div className="bg-muted/40 rounded-lg p-8 space-y-4">
+              <div className="h-8 w-64 bg-muted rounded"></div>
+              <div className="h-4 w-full bg-muted rounded"></div>
+              <div className="h-4 w-3/4 bg-muted rounded"></div>
+            </div>
+            <div className="mt-8">
+              <div className="h-8 w-48 bg-muted rounded mb-4"></div>
+              <div className="grid gap-4">
+                <div className="h-24 w-full bg-muted rounded"></div>
+                <div className="h-24 w-full bg-muted rounded"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   if (!isCreating) {
     return (
       <DashboardLayout>
@@ -1013,7 +1037,7 @@ export default function IntegrationsPage() {
             </div>
 
             <div className="mt-8">
-              <h3 className="text-lg font-medium mb-4">Saved Integrations</h3>
+              <h3 className="text-2xl font-medium mb-4">Saved Integrations</h3>
               <div className="grid gap-4">
                 {savedAutomations.map((automation) => (
                   <Card 
@@ -1023,34 +1047,12 @@ export default function IntegrationsPage() {
                   >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
                       <div className="flex items-center gap-4">
-                        <CardTitle className="font-normal">{automation.name || automation.id}</CardTitle>
-                        <div className="flex items-center gap-2">
-                          {Object.values(automation.steps).map((step, index) => {
-                            const stepType = step.type;
-                            const integration = integrationIcons[stepType];
-                            if (!integration) return null;
-                            
-                            return (
-                              <div
-                                key={`${automation.id}-${stepType}-${index}`}
-                                className="h-6 w-6 rounded-md bg-background flex items-center justify-center transform transition-all hover:scale-110"
-                                title={integration.name}
-                              >
-                                {integration.iconUrl && (
-                                  <Image
-                                    src={integration.iconUrl}
-                                    alt={integration.name}
-                                    width={16}
-                                    height={16}
-                                    className={`${integration.color} transform transition-all`}
-                                  />
-                                )}
-                              </div>
-                            );
-                          })}
+                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                          {renderIcon(integrationIcons[automation.steps[0]?.type || "hubspot"])}
                         </div>
+                        <CardTitle className="font-bold text-lg">{automation.name || automation.id}</CardTitle>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground transform transition-transform group-hover:translate-x-1" />
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                   </Card>
                 ))}
@@ -1149,10 +1151,6 @@ export default function IntegrationsPage() {
                 Add condition
               </Button>
             </div>
-
-            <Button variant="outline" className="mt-4">
-              Add another condition group
-            </Button>
 
             <div className="mt-8">
               <Button onClick={() => {
@@ -2132,23 +2130,45 @@ export default function IntegrationsPage() {
     <DashboardLayout>
       <div className="p-8 pt-12 max-w-3xl mx-auto">
         <div className="flex flex-col items-start mb-16">
-          <Input
-            value={automationName}
-            onChange={(e) => setAutomationName(e.target.value)}
-            className="text-5xl font-bold bg-transparent border-0 p-0 h-auto w-auto focus-visible:ring-0 tracking-tight leading-none mb-8"
-            placeholder="Untitled Integration"
-          />
-          <div className="flex gap-3 self-end">
-            <Button variant="outline" onClick={() => {
-              setIsCreating(false)
-              setTriggerStep("initial")
-              setSteps([])
-              setSelectedTags([])
-            }} className="text-base px-6">
-              Cancel
-            </Button>
-            <Button className="text-base px-6" onClick={saveAutomation}>Create</Button>
-          </div>
+          {isCreating ? (
+            <div className="space-y-8">
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value={automationName}
+                    onChange={(e) => setAutomationName(e.target.value)}
+                    className="text-lg font-medium bg-transparent border-none focus:ring-0 focus-visible:ring-0 px-0 h-auto"
+                    placeholder="Untitled Integration"
+                  />
+                </div>
+                <div className="flex items-center gap-4">
+                  <Button variant="outline" onClick={() => setIsCreating(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={saveAutomation}>Create</Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value={automationName}
+                    onChange={(e) => setAutomationName(e.target.value)}
+                    className="text-lg font-medium bg-transparent border-none focus:ring-0 focus-visible:ring-0 px-0 h-auto"
+                    placeholder="Untitled Integration"
+                  />
+                </div>
+                <div className="flex items-center gap-4">
+                  <Button variant="outline" onClick={() => setIsCreating(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={saveAutomation}>Create</Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div>

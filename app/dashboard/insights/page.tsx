@@ -208,11 +208,13 @@ export default function InsightsPage() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 border rounded-lg transform transition-all hover:border-primary/50">
-          <p className="text-muted-foreground">No AI insights found</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Set up an integration with AI insights to get started.
-          </p>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md text-center">
+          <Card className="p-12 transform transition-all hover:border-primary/50">
+            <p className="text-xl text-muted-foreground font-medium">No AI insights found</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Set up an integration with AI insights to get started.
+            </p>
+          </Card>
         </div>
       )}
     </div>
