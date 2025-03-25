@@ -223,7 +223,7 @@ export default function MeetingsPage() {
   };
 
   const content = (
-    <div className="w-full max-w-7xl mx-auto">
+    <div className="w-full">
       <div className="flex justify-between items-center mb-6 px-6">
         <h1 className="text-2xl font-semibold">Meetings</h1>
       </div>
@@ -282,7 +282,7 @@ export default function MeetingsPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex gap-2 flex-shrink-0 ml-auto">
+              <div className="flex gap-2 flex-shrink-0 ml-4">
                 {meeting.tags.map((tag) => (
                   <Badge 
                     key={tag} 

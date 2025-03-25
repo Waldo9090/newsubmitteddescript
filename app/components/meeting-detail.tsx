@@ -24,9 +24,8 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { AIChat } from './ai-chat';
 import { EditableContent } from './editable-content';
-import { cn } from '@/lib/utils';
+import { cn, debounce } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { debounce } from 'lodash';
 import { CreateActionItemDialog } from './create-action-item-dialog';
 import { Textarea } from "@/components/ui/textarea";
 

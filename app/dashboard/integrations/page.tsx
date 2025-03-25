@@ -5,7 +5,7 @@ import DashboardLayout from "../components/DashboardLayout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ChevronRight, ChevronLeft, Zap, Share2, Webhook, Tag, Info, X, Plus } from "lucide-react"
+import { ChevronRight, ChevronLeft, Zap, Share2, Webhook, Tag, Info, X, Plus, PlusCircle } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import Image from "next/image"
 import { Textarea } from "@/components/ui/textarea"
@@ -21,6 +21,13 @@ import { Switch } from "@/components/ui/switch"
 import { toast as sonnerToast } from "sonner"
 import { Label } from "@/components/ui/label"
 import { usePathname } from "next/navigation"
+import NotionConnection from "./components/NotionConnection"
+import SlackConnection from "./components/SlackConnection"
+import LinearConnection from "./components/LinearConnection"
+import HubSpotConnection from "./components/HubSpotConnection"
+import SalesforceConnection from "./components/SalesforceConnection"
+import AttioConnection from "./components/AttioConnection"
+import MondayConnection from "./components/MondayConnection"
 
 interface StepConfig {
   tags?: string[];
@@ -60,6 +67,11 @@ interface StepConfig {
   includeActionItems?: boolean;
   portalId?: string;
   accountType?: string;
+  // Monday.com specific fields
+  board?: string;
+  boardName?: string;
+  group?: string;
+  groupName?: string;
 }
 
 interface Step {
@@ -185,14 +197,19 @@ const integrationIcons: Record<string, IntegrationIcon> = {
     iconUrl: "/icons/integrations/Attio.svg",
     color: "text-blue-600",
   },
-  hubspot: {
+  "hubspot": {
     name: "Update HubSpot",
     color: "#ff7a59",
     iconUrl: "/icons/integrations/hubspot.svg"
   },
+  "monday": {
+    name: "Sync with Monday",
+    color: "text-blue-500",
+    iconUrl: "/icons/integrations/Monday.svg"
+  },
 }
 
-type StepType = "initial" | "actions" | "notion" | "slack" | "ai-insights" | "trigger" | "hubspot" | "linear" | null;
+type StepType = "initial" | "actions" | "notion" | "slack" | "ai-insights" | "trigger" | "hubspot" | "linear" | "monday" | null;
 
 const getStepIcon = (stepType: string) => {
   const integration = integrationIcons[stepType as keyof typeof integrationIcons];
@@ -366,6 +383,34 @@ export default function IntegrationsPage() {
   useEffect(() => {
     const url = new URL(window.location.href);
     const justCreated = url.searchParams.get('automation_created');
+    const error = url.searchParams.get('error');
+    const provider = url.searchParams.get('provider');
+    
+    // Handle errors from OAuth redirects
+    if (error) {
+      if (error === 'app_not_installed' && provider === 'monday') {
+        sonnerToast(
+          "Monday.com App Not Installed", 
+          { 
+            description: "You need to install the Descript app from the Monday.com marketplace before connecting.", 
+            style: { backgroundColor: 'orange', color: 'white' },
+            duration: 6000
+          }
+        );
+      } else if (error) {
+        sonnerToast(
+          `Authentication Error: ${error.replace(/_/g, ' ')}`, 
+          { 
+            style: { backgroundColor: 'red', color: 'white' } 
+          }
+        );
+      }
+      
+      // Remove the error param so it doesn't show again on refresh
+      url.searchParams.delete('error');
+      url.searchParams.delete('provider');
+      window.history.replaceState({}, '', url.toString());
+    }
     
     if (justCreated === 'true') {
       console.log('Automation just created, refreshing saved automations');
@@ -1047,10 +1092,20 @@ export default function IntegrationsPage() {
                   >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
                       <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                          {renderIcon(integrationIcons[automation.steps[0]?.type || "hubspot"])}
+                        <div className="flex -space-x-2">
+                          {Object.values(automation.steps)
+                            .filter(step => step.type !== 'trigger')
+                            .map((step, index) => (
+                            <div 
+                              key={`${automation.id}-${step.type}-${index}`}
+                              className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center ring-2 ring-background"
+                              style={{ transform: `translateX(${index * 5}px)` }}
+                            >
+                              {renderIcon(integrationIcons[step.type || "hubspot"])}
+                            </div>
+                          ))}
                         </div>
-                        <CardTitle className="font-bold text-lg">{automation.name || automation.id}</CardTitle>
+                        <CardTitle className="font-bold text-lg ml-4">{automation.name || automation.id}</CardTitle>
                       </div>
                       <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
@@ -1649,6 +1704,48 @@ export default function IntegrationsPage() {
       );
     }
 
+    if (currentStep === "monday") {
+      return (
+        <div className="space-y-8">
+          <button
+            onClick={() => setCurrentStep(null)}
+            className="flex items-center text-muted-foreground hover:text-foreground text-lg"
+          >
+            <ChevronLeft className="h-5 w-5 mr-2" />
+            Create items in monday.com
+          </button>
+
+          <div className="space-y-6 bg-card p-6 rounded-lg border border-border">
+            <MondayConnection 
+              onSave={async (config) => {
+                // Create step data matching the structure needed for monday.com
+                const stepData: Step = {
+                  id: 'monday',
+                  type: 'monday',
+                  title: 'Create items in monday.com',
+                  config: {
+                    board: config.board,
+                    boardName: config.boardName,
+                    group: config.group,
+                    groupName: config.groupName
+                  }
+                };
+
+                // Add step to steps array
+                setSteps(prev => [...prev, stepData]);
+                
+                // Reset current step
+                setCurrentStep(null);
+                
+                sonnerToast("Monday.com configuration saved", { style: { backgroundColor: 'green', color: 'white' } });
+              }}
+              onClose={() => setCurrentStep(null)}
+            />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6">
         <div className="border rounded-lg">
@@ -1708,6 +1805,17 @@ export default function IntegrationsPage() {
                 {renderIcon(integrationIcons["linear"])}
               </div>
               <span className="font-medium text-left text-lg">{integrationIcons["linear"].name}</span>
+              <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" />
+            </button>
+
+            <button
+              className="w-full p-6 flex items-center gap-4 hover:bg-muted/50 transition-colors"
+              onClick={() => setCurrentStep("monday")}
+            >
+              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                {renderIcon(integrationIcons["monday"])}
+              </div>
+              <span className="font-medium text-left text-lg">{integrationIcons["monday"].name}</span>
               <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" />
             </button>
           </div>
@@ -1885,6 +1993,16 @@ export default function IntegrationsPage() {
                 ...stepData,
                 teamId: step.config.teamId || "",
                 teamName: step.config.teamName || ""
+              };
+              break;
+
+            case 'monday':
+              stepData = {
+                ...stepData,
+                board: step.config.board || "",
+                boardName: step.config.boardName || "",
+                group: step.config.group || "",
+                groupName: step.config.groupName || ""
               };
               break;
           }

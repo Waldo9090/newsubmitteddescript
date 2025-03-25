@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface AttioWorkspace {
   id: string;
@@ -16,136 +17,116 @@ interface AttioWorkspace {
 interface AttioConnectionProps {
   onSave?: (config: any) => Promise<void>;
   onClose?: () => void;
-  forceStatus?: "loading" | "connected" | "disconnected";
 }
 
-export default function AttioConnection({ 
-  onSave,
-  onClose,
-  forceStatus
-}: AttioConnectionProps) {
+export default function AttioConnection({ onSave, onClose }: AttioConnectionProps) {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [workspaces, setWorkspaces] = useState<AttioWorkspace[]>([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState<AttioWorkspace | null>(null);
+  const [workspace, setWorkspace] = useState<AttioWorkspace | null>(null);
 
   useEffect(() => {
-    checkConnection();
+    checkConnectionStatus();
   }, []);
 
-  const checkConnection = async () => {
-    if (!user?.email) {
-      console.log('No user email found, skipping connection check');
-      return;
-    }
-    
+  // Check if we're already connected to Attio
+  const checkConnectionStatus = async () => {
+    if (!user?.email) return;
+
     try {
-      console.log('Checking Attio connection status for user:', user.email);
       const response = await fetch('/api/attio/status', {
         headers: {
-          'Authorization': `Bearer ${user.email}`
+          'Authorization': `Bearer ${user.email}`,
+          'Content-Type': 'application/json'
         }
       });
+
       const data = await response.json();
-      console.log('Attio status response:', data);
       
       if (data.connected) {
-        console.log('Attio is connected, updating state');
         setIsConnected(true);
-        setWorkspaces(data.workspaces || []);
-        setSelectedWorkspace(data.selectedWorkspace || null);
+        setWorkspace(data.workspace || null);
       } else {
-        console.log('Attio is not connected');
         setIsConnected(false);
+        setWorkspace(null);
       }
-    } catch (error) {
-      console.error('Error checking Attio connection:', error);
-      setIsConnected(false);
+    } catch (err) {
+      console.error('Error checking Attio connection:', err);
+      setError('Failed to check connection status');
     }
   };
 
+  // Initiate OAuth flow
   const handleConnect = async () => {
+    if (!user?.email) {
+      setError('You must be logged in to connect with Attio');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
     try {
-      setIsLoading(true);
-      console.log('Starting Attio connection process');
-      
+      // Clear any existing tokens
+      document.cookie = "attio_access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "attio_workspace=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
       const response = await fetch('/api/attio/auth', {
         headers: {
-          'Authorization': `Bearer ${user?.email}`
+          'Authorization': `Bearer ${user.email}`,
+          'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
-        const error = await response.json();
-        console.error('Failed to get auth URL:', error);
-        throw new Error(error.message || 'Failed to get auth URL');
+        throw new Error('Failed to initialize Attio connection');
       }
-      
+
       const { url } = await response.json();
-      console.log('Received Attio auth URL:', url);
       
-      // Store the current URL to return to after authorization
+      // Store return URL for after OAuth
       localStorage.setItem('attioReturnUrl', window.location.href);
       
-      // Redirect to Attio
-      console.log('Redirecting to Attio...');
+      // Redirect to Attio OAuth page
       window.location.href = url;
-    } catch (error) {
-      console.error('Error connecting to Attio:', error);
+    } catch (err) {
+      console.error('Error connecting to Attio:', err);
+      setError('Failed to connect with Attio');
       setIsLoading(false);
     }
   };
 
+  // Disconnect from Attio
   const handleDisconnect = async () => {
     if (!user?.email) return;
-    
+
     setIsLoading(true);
+    setError(null);
+
     try {
       const response = await fetch('/api/attio/disconnect', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${user.email}`
-        }
-      });
-      
-      if (response.ok) {
-        setIsConnected(false);
-        setWorkspaces([]);
-        setSelectedWorkspace(null);
-      }
-    } catch (error) {
-      console.error('Error disconnecting from Attio:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleWorkspaceSelect = async (workspace: AttioWorkspace) => {
-    if (!user?.email) return;
-    
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/attio/workspaces/select', {
-        method: 'POST',
-        headers: {
           'Authorization': `Bearer ${user.email}`,
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ workspaceId: workspace.id })
-      });
-      
-      if (response.ok) {
-        setSelectedWorkspace(workspace);
-        if (onSave) {
-          await onSave({
-            workspaceId: workspace.id,
-            workspaceName: workspace.name
-          });
         }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to disconnect from Attio');
       }
-    } catch (error) {
-      console.error('Error selecting workspace:', error);
+
+      // Clear cookies and local storage
+      document.cookie = "attio_access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "attio_workspace=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      localStorage.removeItem('attioReturnUrl');
+
+      setIsConnected(false);
+      setWorkspace(null);
+    } catch (err) {
+      console.error('Error disconnecting from Attio:', err);
+      setError('Failed to disconnect from Attio');
     } finally {
       setIsLoading(false);
     }
@@ -165,9 +146,12 @@ export default function AttioConnection({
           </div>
           <div>
             <h3 className="text-lg font-semibold">Attio</h3>
-            <p className="text-sm text-muted-foreground">Sync your meeting contacts with Attio CRM</p>
+            <p className="text-sm text-muted-foreground">
+              Connect your Attio workspace to sync contacts and manage relationships
+            </p>
           </div>
         </div>
+
         {isConnected ? (
           <Button
             variant="destructive"
@@ -200,39 +184,16 @@ export default function AttioConnection({
         )}
       </div>
 
-      {isConnected && (
-        <div className="space-y-6">
-          {!selectedWorkspace ? (
-            <div>
-              <h4 className="font-medium mb-4">Select a workspace</h4>
-              <div className="grid gap-4">
-                {workspaces.map((workspace) => (
-                  <Button
-                    key={workspace.id}
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => handleWorkspaceSelect(workspace)}
-                    disabled={isLoading}
-                  >
-                    {workspace.icon && (
-                      <Image
-                        src={workspace.icon}
-                        alt={workspace.name}
-                        width={24}
-                        height={24}
-                        className="mr-2"
-                      />
-                    )}
-                    {workspace.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              Connected to {selectedWorkspace.name}
-            </div>
-          )}
+      {error && (
+        <Alert variant="destructive" className="mt-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {isConnected && workspace && (
+        <div className="mt-4 p-4 bg-secondary rounded-lg">
+          <p className="text-sm font-medium">Connected Workspace</p>
+          <p className="text-sm text-muted-foreground">{workspace.name}</p>
         </div>
       )}
     </Card>

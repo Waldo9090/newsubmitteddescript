@@ -53,11 +53,15 @@ export default function RecordDialog({ open, onOpenChange }: RecordDialogProps) 
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [frequencyData, setFrequencyData] = useState<number[]>([]);
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<typeof WaveSurfer | null>(null);
   const animationFrameRef = useRef<number | undefined>(undefined);
   const recordingStartTimeRef = useRef<number>(0);
   const chunksRef = useRef<Blob[]>([]);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   // Handle authentication state
   useEffect(() => {
@@ -121,24 +125,50 @@ export default function RecordDialog({ open, onOpenChange }: RecordDialogProps) 
 
       // Set up audio analysis for visualization
       const audioContext = new AudioContext();
+      audioContextRef.current = audioContext;
       const analyser = audioContext.createAnalyser();
+      analyserRef.current = analyser;
       const source = audioContext.createMediaStreamSource(stream);
       source.connect(analyser);
 
-      analyser.fftSize = 256;
+      // Increase frequency resolution for better visualization
+      analyser.fftSize = 1024;
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
+      const smoothingFactor = 0.3; // Adjust for smoother transitions
 
       const updateWaveform = () => {
-        if (isRecording) {
-          analyser.getByteFrequencyData(dataArray);
-          // Compute average volume level
-          const avg = dataArray.reduce((acc, cur) => acc + cur, 0) / bufferLength;
-          // Update wavesurfer visualization
-          if (wavesurferRef.current) {
-            const progress = Math.min(avg / 255, 1);
-            wavesurferRef.current.drawer.progress(progress);
+        if (isRecording && analyserRef.current) {
+          analyserRef.current.getByteFrequencyData(dataArray);
+          
+          // Get frequency data for visualization
+          const frequencyBands = new Array(50).fill(0);
+          const bandWidth = Math.floor(bufferLength / 50);
+          
+          // Calculate average values for each frequency band
+          for (let i = 0; i < 50; i++) {
+            let sum = 0;
+            const startFreq = i * bandWidth;
+            const endFreq = startFreq + bandWidth;
+            
+            for (let j = startFreq; j < endFreq; j++) {
+              sum += dataArray[j];
+            }
+            frequencyBands[i] = sum / bandWidth;
           }
+
+          // Apply smoothing to the frequency data
+          setFrequencyData(prevData => {
+            if (prevData.length === 0) return frequencyBands;
+            return frequencyBands.map((value, index) => 
+              value * smoothingFactor + prevData[index] * (1 - smoothingFactor)
+            );
+          });
+
+          // Compute overall audio level
+          const avg = dataArray.reduce((acc, cur) => acc + cur, 0) / bufferLength;
+          setAudioLevel(prev => avg / 255 * smoothingFactor + prev * (1 - smoothingFactor));
+          
           requestAnimationFrame(updateWaveform);
         }
       };
@@ -177,12 +207,16 @@ export default function RecordDialog({ open, onOpenChange }: RecordDialogProps) 
     }
   };
 
-  // Stop recording and finalize audio capture
+  // Stop recording and cleanup
   const stopRecording = () => {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
       audioStream?.getTracks().forEach(track => track.stop());
       setIsRecording(false);
+      setAudioLevel(0);
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
     }
   };
 
@@ -511,11 +545,42 @@ export default function RecordDialog({ open, onOpenChange }: RecordDialogProps) 
           <DialogDescription>
             {isRecording
               ? 'Recording in progress. Speak clearly into the microphone.'
-              : 'Press the play button to start recording. The waveform animation reflects audio volume.'}
+              : 'Press the play button to start recording. The waveform will show your audio levels.'}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div ref={waveformRef} className="w-full bg-gray-50 rounded-lg p-4" />
+          {isRecording && (
+            <div className="relative w-full h-32 flex items-center justify-center overflow-hidden bg-gray-50 rounded-lg">
+              <div className="flex items-center space-x-[2px]">
+                {[...Array(50)].map((_, index) => {
+                  const frequencyValue = frequencyData[index] || 0;
+                  const normalizedValue = frequencyValue / 255;
+                  const distanceFromCenter = Math.abs(index - 25) / 25;
+                  const baseHeight = normalizedValue * 100;
+                  const height = Math.max(
+                    4,
+                    baseHeight * (1 - distanceFromCenter * 0.5) + (audioLevel * 20)
+                  );
+
+                  return (
+                    <div
+                      key={index}
+                      className="w-[3px] bg-gradient-to-b from-blue-500 to-blue-600 rounded-full transition-all duration-50"
+                      style={{
+                        height: `${height}px`,
+                        opacity: Math.max(0.4, 1 - distanceFromCenter * 0.5),
+                        transform: `scaleY(${1 + normalizedValue * 0.3})`
+                      }}
+                    />
+                  );
+                })}
+              </div>
+              <div 
+                className="absolute left-0 right-0 top-1/2 h-[1px] bg-gradient-to-r from-transparent via-gray-300 to-transparent"
+                style={{ transform: 'translateY(-50%)' }}
+              />
+            </div>
+          )}
           <div className="flex items-center justify-center space-x-4">
             {!isRecording ? (
               <button

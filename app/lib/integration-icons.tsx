@@ -110,5 +110,18 @@ export const integrationIcons: { [key: string]: IntegrationIcon } = {
       />
     ),
     color: '#F06A6A'
+  },
+  monday: {
+    name: 'Monday',
+    icon: (
+      <Image
+        src="/icons/integrations/Monday.svg"
+        alt="Monday"
+        width={24}
+        height={24}
+        className="rounded-sm"
+      />
+    ),
+    color: '#0073EA'
   }
 }; 

@@ -261,23 +261,53 @@ export default function DashboardLayout({
                   <div className="fixed top-4 right-6 z-50">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full shadow-lg">
-                          <PlusCircle className="mr-2 h-4 w-4" />
+                        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full shadow-lg 
+                          transform transition-all duration-200 hover:scale-105 active:scale-95
+                          animate-button-glow hover:shadow-primary/25 hover:shadow-xl
+                          relative after:absolute after:inset-0 after:rounded-full after:border-2 
+                          after:border-primary/50 after:animate-button-pulse
+                          text-lg py-6 px-6"
+                        >
+                          <PlusCircle className="mr-2 h-5 w-5 transition-transform group-hover:rotate-90 duration-200" />
                           New meeting
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setIsRecordOpen(true)}>
-                          <Mic className="mr-2 h-4 w-4" />
-                          <span>Record</span>
+                      <DropdownMenuContent align="end" className="w-64 p-2">
+                        <DropdownMenuItem 
+                          onClick={() => setIsRecordOpen(true)}
+                          className="flex items-center p-3 hover:bg-primary/10 rounded-lg cursor-pointer"
+                        >
+                          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 mr-3">
+                            <Mic className="h-5 w-5 text-red-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-base">Record</div>
+                            <div className="text-sm text-muted-foreground">Record a new meeting</div>
+                          </div>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setIsImportOpen(true)}>
-                          <Upload className="mr-2 h-4 w-4" />
-                          <span>Import</span>
+                        <DropdownMenuItem 
+                          onClick={() => setIsImportOpen(true)}
+                          className="flex items-center p-3 hover:bg-primary/10 rounded-lg cursor-pointer"
+                        >
+                          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 mr-3">
+                            <Upload className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-base">Import</div>
+                            <div className="text-sm text-muted-foreground">Import existing recording</div>
+                          </div>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setIsInviteOpen(true)}>
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          <span>Invite Descript</span>
+                        <DropdownMenuItem 
+                          onClick={() => setIsInviteOpen(true)}
+                          className="flex items-center p-3 hover:bg-primary/10 rounded-lg cursor-pointer"
+                        >
+                          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 mr-3">
+                            <UserPlus className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-base">Invite Descript</div>
+                            <div className="text-sm text-muted-foreground">Add to calendar events</div>
+                          </div>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -298,4 +328,38 @@ export default function DashboardLayout({
       </MeetingsProvider>
     </SearchProvider>
   );
+}
+
+// Add these keyframe animations at the end of the file, before the last closing brace
+const styles = `
+  @keyframes button-glow {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  @keyframes button-pulse {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0;
+    }
+  }
+`;
+
+// Add style tag to the document
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement("style");
+  styleSheet.textContent = styles;
+  document.head.appendChild(styleSheet);
 } 

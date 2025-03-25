@@ -10,12 +10,27 @@ import SlackConnection from "../../integrations/components/SlackConnection"
 import NotionConnection from "../../integrations/components/NotionConnection"
 import LinearConnection from "../../integrations/components/LinearConnection"
 import HubSpotConnection from "../../integrations/components/HubSpotConnection"
+import MondayConnection from "../../integrations/components/MondayConnection"
+import AttioConnection from "../../integrations/components/AttioConnection"
 import { useAuth } from "@/context/auth-context"
 import { useState } from "react"
+import { toast } from "sonner"
 
 export default function AccountSettings() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleBack = () => {
+    // Function for backward compatibility with components expecting onBack
+  };
+
+  const handleClose = () => {
+    // Empty function for components expecting onClose
+  };
+
+  const handleSave = async (config: any) => {
+    toast.success("Settings saved successfully");
+  };
 
   return (
     <div className="space-y-6">
@@ -24,7 +39,7 @@ export default function AccountSettings() {
           <div className="relative">
             <Avatar className="h-20 w-20">
               <AvatarImage src={user?.photoURL || ""} />
-              <AvatarFallback>{user?.email?.[0].toUpperCase()}</AvatarFallback>
+              <AvatarFallback>{user?.email?.[0]?.toUpperCase()}</AvatarFallback>
             </Avatar>
             <Button
               size="icon"
@@ -52,11 +67,18 @@ export default function AccountSettings() {
         <h2 className="text-xl font-semibold mb-4">Integrations</h2>
         <p className="text-muted-foreground mb-6">Connect your accounts to external services.</p>
         
-        <div className="space-y-4">
-          <NotionConnection />
-          <SlackConnection />
+        <div className="space-y-6">
+          <NotionConnection onClose={handleClose} />
+          
+          <SlackConnection onBack={handleBack} />
+          
           <LinearConnection />
+          
           <HubSpotConnection />
+          
+          <AttioConnection onSave={handleSave} onClose={handleClose} />
+          
+          <MondayConnection onCancel={handleBack} onClose={handleClose} onSave={handleSave} />
         </div>
       </div>
     </div>
