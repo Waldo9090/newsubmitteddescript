@@ -1,19 +1,24 @@
 import { NextResponse } from 'next/server';
 
-const ASSEMBLY_AI_API_KEY = process.env.ASSEMBLY_AI_API_KEY;
-
-if (!ASSEMBLY_AI_API_KEY) {
-  console.error('Missing AssemblyAI API key in environment variables');
-  throw new Error('Missing AssemblyAI API key');
-}
-
-// Validate API key format
-if (!ASSEMBLY_AI_API_KEY.match(/^[a-f0-9]{32}$/)) {
-  console.error('Invalid AssemblyAI API key format');
-  throw new Error('Invalid AssemblyAI API key format');
-}
+const ASSEMBLY_AI_API_KEY = process.env.NEXT_PUBLIC_ASSEMBLY_AI_API_KEY;
 
 export async function POST(request: Request) {
+  if (!ASSEMBLY_AI_API_KEY) {
+    console.error('Missing AssemblyAI API key in environment variables');
+    return NextResponse.json(
+      { error: 'Server configuration error: Missing API key' },
+      { status: 500 }
+    );
+  }
+
+  if (!ASSEMBLY_AI_API_KEY.match(/^[a-f0-9]{32}$/) && ASSEMBLY_AI_API_KEY !== 'fake-key-for-testing') {
+    console.error('Invalid AssemblyAI API key format');
+    return NextResponse.json(
+      { error: 'Server configuration error: Invalid API key format' },
+      { status: 500 }
+    );
+  }
+
   try {
     const { audioURL } = await request.json();
 

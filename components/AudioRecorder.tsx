@@ -14,9 +14,6 @@ interface AudioRecorderProps {
 }
 
 const ASSEMBLY_AI_API_KEY = process.env.ASSEMBLY_AI_API_KEY || process.env.NEXT_PUBLIC_ASSEMBLY_AI_API_KEY;
-if (!ASSEMBLY_AI_API_KEY) {
-  throw new Error('Missing AssemblyAI API key in environment variables');
-}
 
 export function AudioRecorder({ onClose }: AudioRecorderProps) {
   const { user } = useAuth();
@@ -32,6 +29,13 @@ export function AudioRecorder({ onClose }: AudioRecorderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
+  
+  // Check for API key on client-side only
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !ASSEMBLY_AI_API_KEY) {
+      console.error('Missing AssemblyAI API key in environment variables');
+    }
+  }, []);
 
   // Additional component logic and handlers would be here
 

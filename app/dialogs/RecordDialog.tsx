@@ -23,10 +23,6 @@ interface RecordDialogProps {
 
 const ASSEMBLY_AI_API_KEY = process.env.NEXT_PUBLIC_ASSEMBLY_AI_API_KEY;
 
-if (!ASSEMBLY_AI_API_KEY) {
-  throw new Error('Missing AssemblyAI API key in environment variables');
-}
-
 interface ActionItem {
   title: string;
   description: string;
@@ -62,6 +58,13 @@ export default function RecordDialog({ open, onOpenChange }: RecordDialogProps) 
   const chunksRef = useRef<Blob[]>([]);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+
+  // Check for API key on client-side only
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !ASSEMBLY_AI_API_KEY) {
+      console.error('Missing AssemblyAI API key in environment variables');
+    }
+  }, []);
 
   // Handle authentication state
   useEffect(() => {
