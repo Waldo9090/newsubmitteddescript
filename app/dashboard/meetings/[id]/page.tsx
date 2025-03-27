@@ -33,9 +33,36 @@ interface Meeting {
   speakerTranscript: { [key: string]: SpeakerTranscript };
   tags: string[];
   timestamp: number;
+  timestampMs: number;
   transcript: string;
   title: string;
+  type: string;
 }
+
+// Function to convert Meeting to MeetingData for the MeetingDetail component
+const adaptMeetingToMeetingData = (meeting: Meeting): any => {
+  // Convert actionItems from object to array format
+  const actionItemsArray = Object.entries(meeting.actionItems || {}).map(([id, item]) => ({
+    id,
+    title: item.text,
+    description: item.text,
+    done: item.completed || false,
+  }));
+
+  // Convert speakerTranscript from object to array format
+  const speakerTranscriptArray = Object.entries(meeting.speakerTranscript || {}).map(([id, item]) => ({
+    speaker: item.speaker,
+    text: item.text,
+    start: item.timestamp,
+    end: item.timestamp + (item.duration || 0),
+  }));
+
+  return {
+    ...meeting,
+    actionItems: actionItemsArray,
+    speakerTranscript: speakerTranscriptArray,
+  };
+};
 
 export default function MeetingPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -96,7 +123,9 @@ export default function MeetingPage({ params }: { params: { id: string } }) {
             actionItems: data.actionItems || {},
             speakerTranscript: data.speakerTranscript || {},
             videoURL: data.videoURL,
-            botId: data.botId
+            botId: data.botId,
+            timestampMs: data.timestampMs || timestamp,
+            type: data.type || 'unknown'
           };
 
           console.log('Processed meeting data:', meetingData);
@@ -159,7 +188,8 @@ export default function MeetingPage({ params }: { params: { id: string } }) {
         )}
       </div>
       <MeetingDetail 
-        meeting={meeting} 
+        // Convert Meeting to MeetingData format required by the component
+        meeting={adaptMeetingToMeetingData(meeting)} 
         onClose={() => router.push('/dashboard/meetings')} 
         onDelete={() => router.push('/dashboard/meetings')}
       />
