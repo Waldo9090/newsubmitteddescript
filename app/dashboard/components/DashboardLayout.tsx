@@ -84,7 +84,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar>
           <SidebarHeader className="p-4 border-b">
-            <Link href="/" className="flex items-center">
+            <Link href={"/" as any} className="flex items-center">
               <span className="text-xl font-bold">
                 <span className="text-primary">Descript</span>
                 <span className="text-foreground">AI</span>
@@ -96,7 +96,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <SidebarMenu className="space-y-2 px-2">
                 {sidebarItems.map((item) => (
                   <SidebarMenuItem key={item.label}>
-                    <Link href={item.href} legacyBehavior passHref>
+                    <Link href={item.href as any} legacyBehavior passHref>
                       <SidebarMenuButton asChild isActive={isActive(item.href)}>
                         <a>
                           <item.icon className="h-5 w-5 mr-3" />
@@ -119,14 +119,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem>
-                  <Link href="/dashboard/settings/billing" className="flex items-center">
+                  <Link href={"/dashboard/settings/billing" as any} className="flex items-center">
                     <CreditCard className="mr-2 h-4 w-4" />
                     <span>Manage billing</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
-                  <Link href="/" className="flex items-center">
+                  <Link href={"/" as any} className="flex items-center">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Sign out</span>
                   </Link>
