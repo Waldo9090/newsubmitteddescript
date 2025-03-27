@@ -7,8 +7,8 @@ export async function GET(request: NextRequest) {
   console.log('Notion auth endpoint called');
   
   try {
-    // Get the base URL from environment or default to localhost
-    const baseUrl = process.env.NEXTAUTH_URL || 'https://www.aisummarizer-descript.com';
+    // Always use the production URL for Vercel deployment
+    const baseUrl = 'https://www.aisummarizer-descript.com';
     console.log('Using base URL:', baseUrl);
     
     // Get the user email from the authorization header

@@ -4,9 +4,7 @@ import { cookies } from 'next/headers';
 
 // Attio OAuth configuration
 const ATTIO_CLIENT_ID = process.env.ATTIO_CLIENT_ID || 'b98e1808-8a21-4ac6-94af-e2fb4dfc79ce';
-const REDIRECT_URI = process.env.NEXT_PUBLIC_BASE_URL 
-  ? `${process.env.NEXT_PUBLIC_BASE_URL}/api/attio/callback`
-  : 'https://www.aisummarizer-descript.com/api/attio/callback';
+const REDIRECT_URI = 'https://www.aisummarizer-descript.com/api/attio/callback';
 
 export async function GET(request: Request) {
   try {

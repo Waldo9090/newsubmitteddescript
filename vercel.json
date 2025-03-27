@@ -7,5 +7,9 @@
         "installCommand": "pnpm install --no-frozen-lockfile"
       }
     }
-  ]
+  ],
+  "env": {
+    "NEXTAUTH_URL": "https://www.aisummarizer-descript.com",
+    "NEXT_PUBLIC_BASE_URL": "https://www.aisummarizer-descript.com"
+  }
 } 
