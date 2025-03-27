@@ -166,7 +166,11 @@ export default function AutomationForms({ selectedAction, onSave, onCancel, auto
   };
 
   if (selectedAction === "email_automation") {
-    return <EmailAutomations />;
+    return <EmailAutomations 
+      onSave={handleSaveAutomation}
+      onCancel={onCancel}
+      savedConfig={savedConfig}
+    />;
   }
 
   if (selectedAction === "generate_insights") {
