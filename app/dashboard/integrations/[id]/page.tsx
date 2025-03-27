@@ -45,42 +45,42 @@ interface SavedAutomation {
 
 const integrationIcons: Record<string, { name: string; iconUrl: string; color: string }> = {
   "ai-insights": {
-    name: "Generate insights with AI",
+    name: "AI Insights",
     iconUrl: "/icons/integrations/ai-insights.svg",
-    color: "text-purple-500",
+    color: "#6366F1",
   },
   "slack": {
-    name: "Send notes to Slack",
+    name: "Slack",
     iconUrl: "/icons/integrations/slack.svg",
-    color: "text-green-500",
+    color: "#E01E5A",
   },
   "notion": {
-    name: "Update Notion",
+    name: "Notion",
     iconUrl: "/icons/integrations/notion.svg",
-    color: "text-gray-900 dark:text-gray-100",
+    color: "#000000",
   },
   "linear": {
-    name: "Create Linear tasks",
+    name: "Linear",
     iconUrl: "/icons/integrations/linear.svg",
-    color: "text-blue-500",
+    color: "#5E6AD2",
   },
   "hubspot": {
-    name: "Update HubSpot",
+    name: "HubSpot",
     iconUrl: "/icons/integrations/hubspot.svg",
-    color: "#ff7a59",
+    color: "#FF7A59",
   },
   "monday": {
-    name: "Sync with Monday",
+    name: "Monday",
     iconUrl: "/icons/integrations/monday.svg",
     color: "#0073EA",
   },
   "attio": {
-    name: "Sync with Attio",
+    name: "Attio",
     iconUrl: "/icons/integrations/attio.svg",
     color: "#000000",
   },
   "salesforce": {
-    name: "Sync with Salesforce",
+    name: "Salesforce",
     iconUrl: "/icons/integrations/salesforce.svg",
     color: "#00A1E0",
   }
@@ -488,12 +488,22 @@ export default function AutomationDetailsPage() {
           {step.type === 'slack' && <Image src="/icons/integrations/slack.svg" alt="Slack" width={24} height={24} />}
           {step.type === 'notion' && <Image src="/icons/integrations/notion.svg" alt="Notion" width={24} height={24} />}
           {step.type === 'linear' && <Image src="/icons/integrations/linear.svg" alt="Linear" width={24} height={24} />}
+          {step.type === 'hubspot' && <Image src="/icons/integrations/hubspot.svg" alt="HubSpot" width={24} height={24} />}
+          {step.type === 'monday' && <Image src="/icons/integrations/monday.svg" alt="Monday" width={24} height={24} />}
+          {step.type === 'attio' && <Image src="/icons/integrations/attio.svg" alt="Attio" width={24} height={24} />}
+          {step.type === 'salesforce' && <Image src="/icons/integrations/salesforce.svg" alt="Salesforce" width={24} height={24} />}
+          {step.type === 'ai-insights' && <Image src="/icons/integrations/ai-insights.svg" alt="AI Insights" width={24} height={24} />}
         </div>
         <span className="font-medium text-lg">
           {step.type === 'trigger' && `After every meeting with tags: ${step.config?.tags?.join(", ") || "any"}`}
           {step.type === 'slack' && "Send notes to Slack"}
           {step.type === 'notion' && "Update Notion"}
           {step.type === 'linear' && "Create Linear tasks"}
+          {step.type === 'hubspot' && "Update HubSpot"}
+          {step.type === 'monday' && "Sync with Monday"}
+          {step.type === 'attio' && "Sync with Attio"}
+          {step.type === 'salesforce' && "Sync with Salesforce"}
+          {step.type === 'ai-insights' && "Generate insights with AI"}
         </span>
         <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" />
       </div>

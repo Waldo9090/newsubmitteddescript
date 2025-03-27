@@ -172,44 +172,44 @@ interface HubSpotIntegration {
 
 const integrationIcons: Record<string, IntegrationIcon> = {
   "ai-insights": {
-    name: "Generate insights with AI",
+    name: "AI Insights",
     iconUrl: "/icons/integrations/ai-insights.svg",
-    color: "text-purple-500",
+    color: "#6366F1",
   },
   "slack": {
-    name: "Send notes to Slack",
+    name: "Slack",
     iconUrl: "/icons/integrations/slack.svg",
-    color: "text-green-500",
+    color: "#E01E5A",
   },
   "notion": {
-    name: "Update Notion",
+    name: "Notion",
     iconUrl: "/icons/integrations/notion.svg",
-    color: "text-gray-900 dark:text-gray-100",
+    color: "#000000",
   },
   "linear": {
-    name: "Create Linear tasks",
+    name: "Linear",
     iconUrl: "/icons/integrations/linear.svg",
-    color: "text-blue-500",
+    color: "#5E6AD2",
   },
   "hubspot": {
-    name: "Update HubSpot",
-    color: "#ff7a59",
-    iconUrl: "/icons/integrations/hubspot.svg"
+    name: "HubSpot",
+    iconUrl: "/icons/integrations/hubspot.svg",
+    color: "#FF7A59"
   },
   "monday": {
-    name: "Sync with Monday",
-    color: "text-blue-500",
-    iconUrl: "/icons/integrations/monday.svg"
+    name: "Monday",
+    iconUrl: "/icons/integrations/monday.svg",
+    color: "#0073EA"
   },
   "attio": {
-    name: "Sync with Attio",
-    color: "text-blue-600",
-    iconUrl: "/icons/integrations/attio.svg"
+    name: "Attio",
+    iconUrl: "/icons/integrations/attio.svg",
+    color: "#000000"
   },
   "salesforce": {
-    name: "Sync with Salesforce",
-    color: "#00A1E0",
-    iconUrl: "/icons/integrations/salesforce.svg"
+    name: "Salesforce",
+    iconUrl: "/icons/integrations/salesforce.svg",
+    color: "#00A1E0"
   }
 }
 
