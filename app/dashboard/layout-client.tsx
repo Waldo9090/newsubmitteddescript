@@ -42,9 +42,8 @@ import {
 } from "@/components/ui/sidebar";
 import { ChatColumn } from '@/components/chat/ChatColumn';
 import { useState, useEffect } from "react";
-import RecordDialog from "@/app/dialogs/RecordDialog";
-import ImportDialog from "@/app/dialogs/ImportDialog";
-import InviteDialog from "@/app/dialogs/InviteDialog";
+import dynamic from 'next/dynamic';
+import { Suspense } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { useSearch } from '@/src/context/search-context';
@@ -53,6 +52,19 @@ import { MeetingsProvider } from '@/src/context/meetings-context';
 import { SearchProvider } from "@/src/context/search-context";
 import { useTheme } from "next-themes";
 import type { ChangeEvent, MouseEvent } from 'react';
+
+// Dynamically import dialogs to prevent them from being loaded during static rendering
+const RecordDialog = dynamic(() => import("@/app/dialogs/RecordDialog"), { 
+  ssr: false,
+  loading: () => <div>Loading...</div>
+});
+const ImportDialog = dynamic(() => import("@/app/dialogs/ImportDialog"), { 
+  ssr: false,
+  loading: () => <div>Loading...</div>
+});
+const InviteDialog = dynamic(() => import("@/app/dialogs/InviteDialog"), { 
+  ssr: false 
+});
 
 // Define the meeting interface
 interface ActionItem {
@@ -362,9 +374,15 @@ export default function DashboardLayout({
           </div>
 
           {/* Dialog Components */}
-          <RecordDialog open={isRecordOpen} onOpenChange={setIsRecordOpen} />
-          <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
-          <InviteDialog open={isInviteOpen} onOpenChange={setIsInviteOpen} />
+          <Suspense fallback={<div>Loading...</div>}>
+            <RecordDialog open={isRecordOpen} onOpenChange={setIsRecordOpen} />
+          </Suspense>
+          <Suspense fallback={<div>Loading...</div>}>
+            <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
+          </Suspense>
+          <Suspense fallback={<div>Loading...</div>}>
+            <InviteDialog open={isInviteOpen} onOpenChange={setIsInviteOpen} />
+          </Suspense>
         </SidebarProvider>
       </MeetingsProvider>
     </SearchProvider>

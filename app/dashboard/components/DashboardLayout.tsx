@@ -43,9 +43,21 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import RecordDialog from "@/app/dialogs/RecordDialog"
-import ImportDialog from "@/app/dialogs/ImportDialog"
-import InviteDialog from "@/app/dialogs/InviteDialog"
+import dynamic from 'next/dynamic';
+import { Suspense } from 'react';
+
+// Dynamically import dialogs to prevent them from being loaded during static rendering
+const RecordDialog = dynamic(() => import("@/app/dialogs/RecordDialog"), { 
+  ssr: false,
+  loading: () => <div>Loading...</div>
+});
+const ImportDialog = dynamic(() => import("@/app/dialogs/ImportDialog"), { 
+  ssr: false,
+  loading: () => <div>Loading...</div>
+});
+const InviteDialog = dynamic(() => import("@/app/dialogs/InviteDialog"), { 
+  ssr: false 
+});
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -215,9 +227,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Dialog Components */}
-      <RecordDialog open={isRecordOpen} onOpenChange={setIsRecordOpen} />
-      <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
-      <InviteDialog open={isInviteOpen} onOpenChange={setIsInviteOpen} />
+      <Suspense fallback={<div>Loading...</div>}>
+        <RecordDialog open={isRecordOpen} onOpenChange={setIsRecordOpen} />
+      </Suspense>
+      <Suspense fallback={<div>Loading...</div>}>
+        <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
+      </Suspense>
+      <Suspense fallback={<div>Loading...</div>}>
+        <InviteDialog open={isInviteOpen} onOpenChange={setIsInviteOpen} />
+      </Suspense>
     </SidebarProvider>
   )
 }
