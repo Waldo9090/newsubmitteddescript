@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlusCircle, ArrowRight, Pencil } from "lucide-react";
-import AutomationForms from "./AutomationForms";
 import { integrationIcons } from "@/app/lib/integration-icons";
 
 interface AutomationStep {
@@ -161,11 +160,12 @@ export default function CreateAutomation() {
         )}
 
         {step === "configure" && selectedAction && (
-          <AutomationForms
-            selectedAction={selectedAction}
-            onSave={handleSave}
-            onCancel={() => setStep("what")}
-          />
+          <div className="p-6 text-center">
+            <p className="text-muted-foreground mb-4">This automation configuration has been removed.</p>
+            <Button onClick={() => setStep("what")} variant="outline">
+              Go Back
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>
