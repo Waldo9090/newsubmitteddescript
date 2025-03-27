@@ -59,6 +59,32 @@ export const integrationIcons: { [key: string]: IntegrationIcon } = {
     ),
     color: '#FF7A59'
   },
+  salesforce: {
+    name: 'Salesforce',
+    icon: (
+      <Image
+        src="/icons/integrations/salesforce.svg"
+        alt="Salesforce"
+        width={24}
+        height={24}
+        className="rounded-sm"
+      />
+    ),
+    color: '#00A1E0'
+  },
+  attio: {
+    name: 'Attio',
+    icon: (
+      <Image
+        src="/icons/integrations/attio.svg"
+        alt="Attio"
+        width={24}
+        height={24}
+        className="rounded-sm"
+      />
+    ),
+    color: '#000000'
+  },
   'google-calendar': {
     name: 'Google Calendar',
     icon: (
@@ -115,7 +141,7 @@ export const integrationIcons: { [key: string]: IntegrationIcon } = {
     name: 'Monday',
     icon: (
       <Image
-        src="/icons/integrations/Monday.svg"
+        src="/icons/integrations/monday.svg"
         alt="Monday"
         width={24}
         height={24}
@@ -123,5 +149,18 @@ export const integrationIcons: { [key: string]: IntegrationIcon } = {
       />
     ),
     color: '#0073EA'
+  },
+  'ai-insights': {
+    name: 'AI Insights',
+    icon: (
+      <Image
+        src="/icons/integrations/ai-insights.svg"
+        alt="AI Insights"
+        width={24}
+        height={24}
+        className="rounded-sm"
+      />
+    ),
+    color: '#6366F1'
   }
 }; 

@@ -69,6 +69,21 @@ const integrationIcons: Record<string, { name: string; iconUrl: string; color: s
     iconUrl: "/icons/integrations/hubspot.svg",
     color: "#ff7a59",
   },
+  "monday": {
+    name: "Sync with Monday",
+    iconUrl: "/icons/integrations/monday.svg",
+    color: "#0073EA",
+  },
+  "attio": {
+    name: "Sync with Attio",
+    iconUrl: "/icons/integrations/attio.svg",
+    color: "#000000",
+  },
+  "salesforce": {
+    name: "Sync with Salesforce",
+    iconUrl: "/icons/integrations/salesforce.svg",
+    color: "#00A1E0",
+  }
 };
 
 export default function AutomationDetailsPage() {
@@ -473,7 +488,6 @@ export default function AutomationDetailsPage() {
           {step.type === 'slack' && <Image src="/icons/integrations/slack.svg" alt="Slack" width={24} height={24} />}
           {step.type === 'notion' && <Image src="/icons/integrations/notion.svg" alt="Notion" width={24} height={24} />}
           {step.type === 'linear' && <Image src="/icons/integrations/linear.svg" alt="Linear" width={24} height={24} />}
-          {step.type === 'ai-insights' && <Image src="/icons/integrations/ai-insights.svg" alt="AI Insights" width={24} height={24} />}
         </div>
         <span className="font-medium text-lg">
           {step.type === 'trigger' && `After every meeting with tags: ${step.config?.tags?.join(", ") || "any"}`}

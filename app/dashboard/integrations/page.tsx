@@ -206,6 +206,11 @@ const integrationIcons: Record<string, IntegrationIcon> = {
     color: "text-blue-600",
     iconUrl: "/icons/integrations/attio.svg"
   },
+  "salesforce": {
+    name: "Sync with Salesforce",
+    color: "#00A1E0",
+    iconUrl: "/icons/integrations/salesforce.svg"
+  }
 }
 
 type StepType = "initial" | "actions" | "notion" | "slack" | "ai-insights" | "trigger" | "hubspot" | "linear" | "monday" | "attio" | null;
