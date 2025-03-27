@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import DashboardLayout from "../components/DashboardLayout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -26,8 +25,8 @@ import SlackConnection from "./components/SlackConnection"
 import LinearConnection from "./components/LinearConnection"
 import HubSpotConnection from "./components/HubSpotConnection"
 import SalesforceConnection from "./components/SalesforceConnection"
-import AttioConnection from "./components/AttioConnection"
 import MondayConnection from "./components/MondayConnection"
+import AttioConnection from "./components/AttioConnection"
 
 interface StepConfig {
   tags?: string[];
@@ -192,11 +191,6 @@ const integrationIcons: Record<string, IntegrationIcon> = {
     iconUrl: "/icons/integrations/linear.svg",
     color: "text-blue-500",
   },
-  "attio": {
-    name: "Sync with Attio",
-    iconUrl: "/icons/integrations/Attio.svg",
-    color: "text-blue-600",
-  },
   "hubspot": {
     name: "Update HubSpot",
     color: "#ff7a59",
@@ -205,11 +199,16 @@ const integrationIcons: Record<string, IntegrationIcon> = {
   "monday": {
     name: "Sync with Monday",
     color: "text-blue-500",
-    iconUrl: "/icons/integrations/Monday.svg"
+    iconUrl: "/icons/integrations/monday.svg"
+  },
+  "attio": {
+    name: "Sync with Attio",
+    color: "text-blue-600",
+    iconUrl: "/icons/integrations/attio.svg"
   },
 }
 
-type StepType = "initial" | "actions" | "notion" | "slack" | "ai-insights" | "trigger" | "hubspot" | "linear" | "monday" | null;
+type StepType = "initial" | "actions" | "notion" | "slack" | "ai-insights" | "trigger" | "hubspot" | "linear" | "monday" | "attio" | null;
 
 const getStepIcon = (stepType: string) => {
   const integration = integrationIcons[stepType as keyof typeof integrationIcons];
@@ -240,7 +239,7 @@ const getStepConfigDescription = (step: { type: string; config?: any }) => {
   
   switch (step.type) {
     case "trigger":
-      return `Tags: ${step.config.tags?.length ? step.config.tags.join(", ") : "Any"}`;
+      return `Meeting Tags: ${step.config.tags?.length ? step.config.tags.join(", ") : "Any"}`;
     case "ai-insights":
       return step.config.description;
     default:
@@ -1036,118 +1035,111 @@ export default function IntegrationsPage() {
 
   if (!mounted) {
     return (
-      <DashboardLayout>
-        <div className="p-6 max-w-7xl mx-auto">
-          <h1 className="text-2xl font-semibold mb-6">Integrations</h1>
-          <div className="animate-pulse space-y-6">
-            <div className="bg-muted/40 rounded-lg p-8 space-y-4">
-              <div className="h-8 w-64 bg-muted rounded"></div>
-              <div className="h-4 w-full bg-muted rounded"></div>
-              <div className="h-4 w-3/4 bg-muted rounded"></div>
-            </div>
-            <div className="mt-8">
-              <div className="h-8 w-48 bg-muted rounded mb-4"></div>
-              <div className="grid gap-4">
-                <div className="h-24 w-full bg-muted rounded"></div>
-                <div className="h-24 w-full bg-muted rounded"></div>
-              </div>
+      <div className="p-6 max-w-7xl mx-auto">
+        <h1 className="text-2xl font-semibold mb-6">Integrations</h1>
+        <div className="animate-pulse space-y-6">
+          <div className="bg-muted/40 rounded-lg p-8 space-y-4">
+            <div className="h-8 w-64 bg-muted rounded"></div>
+            <div className="h-4 w-full bg-muted rounded"></div>
+            <div className="h-4 w-3/4 bg-muted rounded"></div>
+          </div>
+          <div className="mt-8">
+            <div className="h-8 w-48 bg-muted rounded mb-4"></div>
+            <div className="grid gap-4">
+              <div className="h-24 w-full bg-muted rounded"></div>
+              <div className="h-24 w-full bg-muted rounded"></div>
             </div>
           </div>
         </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
   if (!isCreating) {
     return (
-      <DashboardLayout>
-        <div className="p-6 max-w-7xl mx-auto">
-          <h1 className="text-2xl font-semibold mb-6">Integrations</h1>
+      <div className="p-6 max-w-7xl mx-auto">
+        <h1 className="text-2xl font-semibold mb-6">Integrations</h1>
 
-          <div className="space-y-6">
-            <div className="bg-muted/40 rounded-lg p-8 space-y-4 transform transition-all hover:bg-muted/50">
-              <h3 className="text-xl font-semibold">Supercharge Your Workflow</h3>
-              <p className="text-muted-foreground">
-                Connect your favorite tools and let DescriptAI do the heavy lifting.
-              </p>
-              <p className="text-muted-foreground">
-                Automatically sync meeting notes to Notion, create tasks in Linear, send updates to Slack, and more - all without lifting a finger.
-              </p>
-              <Button 
-                onClick={() => setIsCreating(true)} 
-                className="mt-4 transform transition-all hover:scale-105 active:scale-95"
-              >
-                Create integration
-              </Button>
-            </div>
+        <div className="space-y-6">
+          <div className="bg-muted/40 rounded-lg p-8 space-y-4 transform transition-all hover:bg-muted/50">
+            <h3 className="text-xl font-semibold">Supercharge Your Workflow</h3>
+            <p className="text-muted-foreground">
+              Connect your favorite tools and let DescriptAI do the heavy lifting.
+            </p>
+            <p className="text-muted-foreground">
+              Automatically sync meeting notes to Notion, create tasks in Linear, send updates to Slack, and more - all without lifting a finger.
+            </p>
+            <Button 
+              onClick={() => setIsCreating(true)} 
+              className="mt-4 transform transition-all hover:scale-105 active:scale-95"
+            >
+              Create integration
+            </Button>
+          </div>
 
-            <div className="mt-8">
-              <h3 className="text-2xl font-medium mb-4">Saved Integrations</h3>
-              <div className="grid gap-4">
-                {savedAutomations.map((automation) => (
-                  <Card 
-                    key={automation.id}
-                    className="cursor-pointer transform transition-all duration-200 hover:bg-accent/50 hover:scale-[1.01] active:scale-[0.99]"
-                    onClick={() => router.push(`/dashboard/integrations/${automation.id}`)}
-                  >
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex -space-x-2">
-                          {Object.values(automation.steps)
-                            .filter(step => step.type !== 'trigger')
-                            .map((step, index) => (
-                            <div 
-                              key={`${automation.id}-${step.type}-${index}`}
-                              className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center ring-2 ring-background"
-                              style={{ transform: `translateX(${index * 5}px)` }}
-                            >
-                              {renderIcon(integrationIcons[step.type || "hubspot"])}
-                            </div>
-                          ))}
-                        </div>
-                        <CardTitle className="font-bold text-lg ml-4">{automation.name || automation.id}</CardTitle>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                    </CardHeader>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 flex-wrap mt-8">
-              {Object.entries(integrationIcons).map(([id, integration]) => (
-                <div
-                  key={id}
-                  className="h-10 w-10 rounded-lg bg-background flex items-center justify-center transform transition-all hover:scale-110 hover:shadow-md"
+          <div className="mt-8">
+            <h3 className="text-2xl font-medium mb-4">Saved Integrations</h3>
+            <div className="grid gap-4">
+              {savedAutomations.map((automation) => (
+                <Card 
+                  key={automation.id}
+                  className="cursor-pointer transform transition-all duration-200 hover:bg-accent/50 hover:scale-[1.01] active:scale-[0.99]"
+                  onClick={() => router.push(`/dashboard/integrations/${automation.id}`)}
                 >
-                  {integration && renderIcon(integration)}
-                </div>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex -space-x-2">
+                        {Object.values(automation.steps)
+                          .filter(step => step.type !== 'trigger')
+                          .map((step, index) => (
+                          <div 
+                            key={`${automation.id}-${step.type}-${index}`}
+                            className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center ring-2 ring-background"
+                            style={{ transform: `translateX(${index * 5}px)` }}
+                          >
+                            {renderIcon(integrationIcons[step.type || "hubspot"])}
+                          </div>
+                        ))}
+                      </div>
+                      <CardTitle className="font-bold text-lg ml-4">{automation.name || automation.id}</CardTitle>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </CardHeader>
+                </Card>
               ))}
             </div>
           </div>
+
+          <div className="flex items-center gap-4 flex-wrap mt-8">
+            {Object.entries(integrationIcons).map(([id, integration]) => (
+              <div
+                key={id}
+                className="h-10 w-10 rounded-lg bg-background flex items-center justify-center transform transition-all hover:scale-110 hover:shadow-md"
+              >
+                {integration && renderIcon(integration)}
+              </div>
+            ))}
+          </div>
         </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
-  const renderTriggerStep = () => {
+  const renderAutomationStep = () => {
     if (triggerStep === "initial") {
       return (
         <div className="space-y-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-medium">Trigger</h2>
+              <h2 className="text-xl font-medium">Meeting Specifications</h2>
             </div>
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
           </div>
 
           <div>
-            <h3 className="text-lg font-medium mb-4">When to run</h3>
-            <p className="text-muted-foreground mb-6">
-              Select specific meeting tags to trigger this integration. Without any conditions, the integration will process all meetings automatically.
-            </p>
-
+            <h3 className="text-lg font-medium mb-4">Timing</h3>
+            
             <div className="bg-muted/30 p-6 rounded-lg space-y-4">
               {selectedTags.map((tag, index) => (
                 <div key={index} className="flex items-center gap-2">
@@ -1213,7 +1205,7 @@ export default function IntegrationsPage() {
                 const tagsList = selectedTags.length > 0 ? selectedTags.join(", ") : "any"
                 setSteps((prev) => [...prev, {
                   id: "trigger",
-                  title: `After every meeting with tags: ${tagsList}`,
+                  title: `Automate when: Meeting with tags: ${tagsList}`,
                   type: "trigger",
                   config: { tags: selectedTags }
                 }])
@@ -1459,7 +1451,7 @@ export default function IntegrationsPage() {
             <div>
               <h2 className="text-lg font-medium mb-3">Insight name</h2>
               <Input
-                placeholder="Client obstacles"
+                placeholder="Product Feature Requests"
                 className="text-base"
                 value={insightName}
                 onChange={(e) => setInsightName(e.target.value)}
@@ -1473,7 +1465,7 @@ export default function IntegrationsPage() {
                 Describe in detail what you'd like generated from your meetings.
               </p>
               <Textarea
-                placeholder="The challenges or obstacles the client brings up about fintech's analytics platform. For example, they're finding it hard to onboard to fintech's analytics platform."
+                placeholder="Specific feature requests or product improvements mentioned by the client during the call. For example, they suggested adding a dashboard export feature or improving the data visualization capabilities."
                 className="min-h-[100px] text-base"
                 value={insightDescription}
                 onChange={(e) => setInsightDescription(e.target.value)}
@@ -1493,21 +1485,18 @@ export default function IntegrationsPage() {
                       <RadioGroupItem value="auto" id="auto" />
                       <div>
                         <label htmlFor="auto" className="text-base font-medium block">Choose for me</label>
-                        <p className="text-sm text-muted-foreground">How many of this insight to generate per meeting will be chosen automatically.</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3 mb-4">
                       <RadioGroupItem value="one" id="one" />
                       <div>
                         <label htmlFor="one" className="text-base font-medium block">One</label>
-                        <p className="text-sm text-muted-foreground">One of this insight will be generated per meeting at most.</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
                       <RadioGroupItem value="multiple" id="multiple" />
                       <div>
                         <label htmlFor="multiple" className="text-base font-medium block">Multiple</label>
-                        <p className="text-sm text-muted-foreground">One or more of this insight may be generated per meeting.</p>
                       </div>
                     </div>
                   </RadioGroup>
@@ -2245,76 +2234,74 @@ export default function IntegrationsPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="p-8 pt-12 max-w-3xl mx-auto">
-        <div className="flex flex-col items-start mb-16">
-          {isCreating ? (
-            <div className="space-y-8">
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2">
-                  <Input 
-                    value={automationName}
-                    onChange={(e) => setAutomationName(e.target.value)}
-                    className="text-lg font-medium bg-transparent border-none focus:ring-0 focus-visible:ring-0 px-0 h-auto"
-                    placeholder="Untitled Integration"
-                  />
-                </div>
-                <div className="flex items-center gap-4">
-                  <Button variant="outline" onClick={() => setIsCreating(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={saveAutomation}>Create</Button>
-                </div>
+    <div className="p-8 pt-12 max-w-3xl mx-auto">
+      <div className="flex flex-col items-start mb-16">
+        {isCreating ? (
+          <div className="space-y-8">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2">
+                <Input 
+                  value={automationName}
+                  onChange={(e) => setAutomationName(e.target.value)}
+                  className="text-lg font-medium bg-transparent border-none focus:ring-0 focus-visible:ring-0 px-0 h-auto"
+                  placeholder="Untitled Integration"
+                />
+              </div>
+              <div className="flex items-center gap-4">
+                <Button variant="outline" onClick={() => setIsCreating(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={saveAutomation}>Create</Button>
               </div>
             </div>
-          ) : (
-            <div className="space-y-8">
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2">
-                  <Input 
-                    value={automationName}
-                    onChange={(e) => setAutomationName(e.target.value)}
-                    className="text-lg font-medium bg-transparent border-none focus:ring-0 focus-visible:ring-0 px-0 h-auto"
-                    placeholder="Untitled Integration"
-                  />
-                </div>
-                <div className="flex items-center gap-4">
-                  <Button variant="outline" onClick={() => setIsCreating(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={saveAutomation}>Create</Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <div className="space-y-8 mb-12">
-            {steps.map((step, index) => (
-              <div 
-                key={step.id} 
-                className="flex items-center gap-3 p-4 bg-card rounded-lg border border-border cursor-pointer"
-                onClick={() => {
-                  if (step.id === "trigger") {
-                    setTriggerStep("initial")
-                    setCurrentStep(null)
-                  }
-                }}
-              >
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  {renderIcon(integrationIcons[step.type as keyof typeof integrationIcons])}
-                </div>
-                <span className="font-medium text-lg">{step.title}</span>
-                <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" />
-              </div>
-            ))}
           </div>
-
-          <div className="mt-8">{renderTriggerStep()}</div>
-        </div>
+        ) : (
+          <div className="space-y-8">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2">
+                <Input 
+                  value={automationName}
+                  onChange={(e) => setAutomationName(e.target.value)}
+                  className="text-lg font-medium bg-transparent border-none focus:ring-0 focus-visible:ring-0 px-0 h-auto"
+                  placeholder="Untitled Integration"
+                />
+              </div>
+              <div className="flex items-center gap-4">
+                <Button variant="outline" onClick={() => setIsCreating(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={saveAutomation}>Create</Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </DashboardLayout>
+
+      <div>
+        <div className="space-y-8 mb-12">
+          {steps.map((step, index) => (
+            <div 
+              key={step.id} 
+              className="flex items-center gap-3 p-4 bg-card rounded-lg border border-border cursor-pointer"
+              onClick={() => {
+                if (step.id === "trigger") {
+                  setTriggerStep("initial")
+                  setCurrentStep(null)
+                }
+              }}
+            >
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                {renderIcon(integrationIcons[step.type as keyof typeof integrationIcons])}
+              </div>
+              <span className="font-medium text-lg">{step.title}</span>
+              <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" />
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-8">{renderAutomationStep()}</div>
+      </div>
+    </div>
   )
 }
 

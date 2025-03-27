@@ -38,7 +38,7 @@ export default function TeamSettings() {
       <div>
         <h2 className="text-xl font-semibold mb-2">Team configuration</h2>
         <p className="text-muted-foreground mb-6">
-          Teams on Circleback allow you to share meetings and automations, search across shared conversations, and
+          Teams allow you to share meetings and automations, search across shared conversations, and
           more.
         </p>
 
@@ -51,7 +51,7 @@ export default function TeamSettings() {
           <Badge variant="secondary">Beta</Badge>
         </div>
         <p className="text-muted-foreground mb-6">
-          Connect your team's Slack workspace to use Circleback in huddles. Create a team to get started.
+          Connect your team's Slack workspace. 
         </p>
 
         <div className="flex items-center justify-between p-4 bg-card rounded-lg border">

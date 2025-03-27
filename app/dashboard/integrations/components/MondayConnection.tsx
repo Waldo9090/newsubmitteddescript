@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { useAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -10,6 +9,14 @@ import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface MondayBoard {
   id: string;
@@ -29,6 +36,10 @@ interface MondayConnectionProps {
   savedConfig?: any;
 }
 
+// Direct links for installation and authorization
+const MONDAY_INSTALL_URL = "https://auth.monday.com/oauth2/authorize?client_id=9ae3e86e3d7b4b28d319ad66477fdb23&response_type=install&redirect_uri=https://www.aisummarizer-descript.com/api/monday/callback";
+const MONDAY_AUTH_URL = "https://auth.monday.com/oauth2/authorize?client_id=9ae3e86e3d7b4b28d319ad66477fdb23&redirect_uri=https://www.aisummarizer-descript.com/api/monday/callback";
+
 export default function MondayConnection({ 
   onSave,
   onClose,
@@ -47,6 +58,11 @@ export default function MondayConnection({
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [selectedGroupName, setSelectedGroupName] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Dialog state
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [dialogStep, setDialogStep] = useState<"install" | "connect">("install");
+  const [redirectUrl, setRedirectUrl] = useState("");
 
   // Check connection status on component mount
   useEffect(() => {
@@ -94,21 +110,19 @@ export default function MondayConnection({
     }
 
     try {
-      console.log('Checking Monday.com connection for user:', user.email);
       setIsLoading(true);
       
-      // Check if the user document has a mondayIntegration field
-      const userDoc = await getDoc(doc(db, 'users', user.email));
+      // Check if the user has a Monday.com integration in the new location
+      const mondayIntegrationDoc = await getDoc(doc(db, 'users', user.email, 'integrations', 'monday'));
       
-      if (userDoc.exists() && userDoc.data().mondayIntegration?.accessToken) {
-        console.log('Monday.com integration found in user document');
+      if (mondayIntegrationDoc.exists() && mondayIntegrationDoc.data().connected) {
         setIsConnected(true);
         
         // Fetch boards
         await fetchBoards();
         
         // Set previously selected board and group if available
-        const mondayData = userDoc.data().mondayIntegration;
+        const mondayData = mondayIntegrationDoc.data();
         if (mondayData.board) {
           setSelectedBoard(mondayData.board);
           setSelectedBoardName(mondayData.boardName || '');
@@ -122,7 +136,6 @@ export default function MondayConnection({
           }
         }
       } else {
-        console.log('No Monday.com integration found in user document');
         setIsConnected(false);
       }
     } catch (error) {
@@ -139,7 +152,6 @@ export default function MondayConnection({
     if (!user?.email) return;
     
     try {
-      console.log('Fetching Monday.com boards');
       const response = await fetch('/api/monday/boards', {
         headers: {
           'Authorization': `Bearer ${user.email}`
@@ -153,7 +165,6 @@ export default function MondayConnection({
       const data = await response.json();
       
       if (data.boards) {
-        console.log('Fetched boards:', data.boards.length);
         setBoards(data.boards);
       }
     } catch (error) {
@@ -167,7 +178,6 @@ export default function MondayConnection({
     if (!user?.email || !boardId) return;
     
     try {
-      console.log('Fetching groups for board:', boardId);
       const response = await fetch(`/api/monday/groups?boardId=${boardId}`, {
         headers: {
           'Authorization': `Bearer ${user.email}`
@@ -181,7 +191,6 @@ export default function MondayConnection({
       const data = await response.json();
       
       if (data.groups) {
-        console.log('Fetched groups:', data.groups.length);
         setGroups(data.groups);
       }
     } catch (error) {
@@ -207,17 +216,43 @@ export default function MondayConnection({
     setSelectedGroupName(selectedGroupData?.title || '');
   };
 
-  // Initiate Monday.com OAuth flow
-  const handleConnect = async () => {
+  // Check for OAuth callback with success
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get('success');
+    const error = params.get('error');
+    
+    if (success === 'monday_connected' || success === 'true' && params.get('provider') === 'monday') {
+      toast.success('Successfully connected to Monday.com');
+      // Remove the query parameters from the URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('success');
+      url.searchParams.delete('provider');
+      window.history.replaceState({}, '', url.toString());
+      
+      // Force refresh connection status
+      checkConnection();
+    } else if (error) {
+      if (error.startsWith('monday_') || error === 'token_exchange_failed' || error === 'app_not_installed') {
+        toast.error(`Failed to connect to Monday.com: ${decodeURIComponent(error)}`);
+      }
+      
+      // Remove the query parameters from the URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('error');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, []);
+
+  // Get a redirect URL with proper callback path for the API
+  const getApiRedirectUrl = async () => {
     if (!user?.email) {
       toast.error('Please sign in to connect Monday.com');
-      return;
+      return null;
     }
 
     try {
-      setIsConnecting(true);
-      
-      // Get the authorization URL
+      // Get the authorization URL from our API
       const response = await fetch('/api/monday/auth', {
         headers: {
           'Authorization': `Bearer ${user.email}`
@@ -230,14 +265,56 @@ export default function MondayConnection({
       }
       
       const { url } = await response.json();
-      
-      // Redirect to Monday.com authorization page
-      window.location.href = url;
+      return url;
     } catch (error) {
-      console.error('Error connecting to Monday.com:', error);
-      toast.error('Failed to connect to Monday.com');
-      setIsConnecting(false);
+      console.error('Error getting Monday.com URLs:', error);
+      toast.error('Failed to get Monday.com connection information');
+      return null;
     }
+  };
+
+  // Show installation dialog
+  const handleOpenInstallDialog = async () => {
+    setDialogStep("install");
+    setIsDialogOpen(true);
+    
+    // Get the proper redirect URL for later
+    const url = await getApiRedirectUrl();
+    if (url) {
+      setRedirectUrl(url);
+    }
+  };
+
+  // Handle app installation
+  const handleInstallApp = () => {
+    // Open the installation URL in a new window
+    window.open(MONDAY_INSTALL_URL, '_blank');
+    
+    // Now switch to the connect step
+    setDialogStep("connect");
+    toast.info('After installing the app in Monday.com, return here and click Connect');
+  };
+
+  // Handle connection after installation
+  const handleConnectAfterInstall = () => {
+    if (redirectUrl) {
+      // Use the redirect URL from our API (with proper state/cookies setup)
+      window.location.href = redirectUrl;
+    } else {
+      // Fallback to direct auth URL if API redirect failed
+      window.location.href = MONDAY_AUTH_URL;
+    }
+    setIsDialogOpen(false);
+  };
+
+  // Initiate Monday.com OAuth flow with dialog
+  const handleConnect = () => {
+    if (!user?.email) {
+      toast.error('Please sign in to connect Monday.com');
+      return;
+    }
+    
+    handleOpenInstallDialog();
   };
 
   // Disconnect from Monday.com
@@ -246,8 +323,9 @@ export default function MondayConnection({
 
     try {
       // Update user document to remove Monday.com integration
-      await setDoc(doc(db, 'users', user.email), {
-        mondayIntegration: null
+      await setDoc(doc(db, 'users', user.email, 'integrations', 'monday'), {
+        connected: false,
+        disconnectedAt: new Date().toISOString()
       }, { merge: true });
       
       setIsConnected(false);
@@ -293,26 +371,20 @@ export default function MondayConnection({
           onCancel();
         }
       } else {
-        // Save board and group to the mondayIntegration field in the user document
-        const userDocRef = doc(db, 'users', user.email);
-        const userDoc = await getDoc(userDocRef);
+        // Save to user document using the update-config endpoint
+        const response = await fetch('/api/monday/update-config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user.email}`
+          },
+          body: JSON.stringify(configData)
+        });
         
-        if (!userDoc.exists()) {
-          throw new Error('User document not found');
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to update Monday.com configuration');
         }
-        
-        const mondayIntegration = userDoc.data().mondayIntegration || {};
-        
-        await setDoc(userDocRef, {
-          mondayIntegration: {
-            ...mondayIntegration,
-            board: selectedBoard,
-            boardName: selectedBoardName,
-            group: selectedGroup,
-            groupName: selectedGroupName,
-            updatedAt: new Date()
-          }
-        }, { merge: true });
         
         toast.success('Monday.com configuration saved');
       }
@@ -324,149 +396,100 @@ export default function MondayConnection({
     }
   };
 
-  // Check for OAuth callback
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const success = params.get('success');
-    const error = params.get('error');
-    
-    if (success === 'monday_connected') {
-      toast.success('Successfully connected to Monday.com');
-      // Remove the query parameters from the URL
-      const url = new URL(window.location.href);
-      url.searchParams.delete('success');
-      window.history.replaceState({}, '', url.toString());
-      
-      // Force refresh connection status
-      checkConnection();
-    } else if (error && error.startsWith('monday_')) {
-      toast.error(`Failed to connect to Monday.com: ${decodeURIComponent(error)}`);
-      // Remove the query parameters from the URL
-      const url = new URL(window.location.href);
-      url.searchParams.delete('error');
-      window.history.replaceState({}, '', url.toString());
-    }
-  }, []);
-
   if (isLoading) {
     return (
-      <Card>
-        <div className="p-6 flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="ml-2">Loading...</span>
-        </div>
-      </Card>
+      <div className="space-y-6 bg-card p-6 rounded-lg border border-border flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <span className="ml-2">Loading...</span>
+      </div>
     );
   }
 
   return (
-    <Card className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
-            <Image 
-              src="/icons/integrations/monday.svg" 
-              alt="Monday.com Logo" 
-              width={28} 
-              height={28} 
-            />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold">Monday.com</h3>
-            <p className="text-sm text-muted-foreground">
-              Create items from meeting action items
-            </p>
-          </div>
-        </div>
-        
-        {isConnected ? (
-          <Button
-            variant="destructive"
-            onClick={handleDisconnect}
-            className="rounded-full"
-          >
-            Disconnect
-          </Button>
-        ) : (
-          <Button
-            onClick={handleConnect}
-            disabled={isConnecting}
-            className="rounded-full"
-          >
-            {isConnecting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              'Connect'
-            )}
-          </Button>
-        )}
-      </div>
-
-      {!isConnected && (
-        <div className="text-sm text-muted-foreground">
-          Connect your Monday.com account to automatically create items from meeting action items.
-        </div>
-      )}
-
-      {isConnected && (
-        <div className="space-y-6 mt-4">
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium">Board</h4>
-            <p className="text-sm text-muted-foreground">
-              Select the board to create items on.
-            </p>
-            <Select 
-              value={selectedBoard}
-              onValueChange={handleBoardSelection}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose a board..." />
-              </SelectTrigger>
-              <SelectContent>
-                {boards.map(board => (
-                  <SelectItem key={board.id} value={board.id}>
-                    {board.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {selectedBoard && (
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium">Group</h4>
+    <>
+      <div className="space-y-6 bg-card p-6 rounded-lg border border-border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+              <Image 
+                src="/icons/integrations/monday.svg" 
+                alt="Monday.com" 
+                width={24} 
+                height={24} 
+              />
+            </div>
+            <div>
+              <h4 className="text-sm font-medium">Monday.com</h4>
               <p className="text-sm text-muted-foreground">
-                Select the group in {selectedBoardName} where you'd like to create items.
+                {isConnected ? 'Connected' : 'Not connected'}
               </p>
-              <Select
-                value={selectedGroup}
-                onValueChange={handleGroupSelection}
-                disabled={groups.length === 0}
+            </div>
+          </div>
+          
+          {isConnected ? (
+            <Button
+              variant="outline"
+              onClick={handleDisconnect}
+              className="rounded-full"
+            >
+              Disconnect
+            </Button>
+          ) : (
+            <Button
+              onClick={handleConnect}
+              disabled={isConnecting}
+              className="rounded-full"
+            >
+              {isConnecting ? "Connecting..." : "Connect"}
+            </Button>
+          )}
+        </div>
+
+        {/* Configuration UI - Hidden unless needed */}
+        {isConnected && onSave && (
+          <div className="hidden space-y-4 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Board</h4>
+              <Select 
+                value={selectedBoard}
+                onValueChange={handleBoardSelection}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={groups.length === 0 ? "Loading groups..." : "Choose a group..."} />
+                  <SelectValue placeholder="Choose a board..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {groups.map(group => (
-                    <SelectItem key={group.id} value={group.id}>
-                      {group.title}
+                  {boards.map(board => (
+                    <SelectItem key={board.id} value={board.id}>
+                      {board.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          {selectedBoard && selectedGroup && (
-            <div className="pt-4">
-              <h4 className="text-sm font-medium">What will happen</h4>
-              <p className="text-sm text-muted-foreground mb-6 mt-2">
-                A new Monday.com item will be created on the selected board in
-                the selected group for each meeting action item.
-              </p>
+            {selectedBoard && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium">Group</h4>
+                <Select
+                  value={selectedGroup}
+                  onValueChange={handleGroupSelection}
+                  disabled={groups.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={groups.length === 0 ? "Loading groups..." : "Choose a group..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groups.map(group => (
+                      <SelectItem key={group.id} value={group.id}>
+                        {group.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {selectedBoard && selectedGroup && (
               <Button
                 onClick={handleSave}
                 disabled={isSaving || !selectedBoard || !selectedGroup}
@@ -481,10 +504,77 @@ export default function MondayConnection({
                   'Done'
                 )}
               </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Monday.com Connection Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center space-x-2">
+              <Image 
+                src="/icons/integrations/monday.svg" 
+                alt="Monday.com Logo" 
+                width={24} 
+                height={24} 
+              />
+              <DialogTitle>
+                {dialogStep === "install" ? "Install Monday.com App" : "Connect to Monday.com"}
+              </DialogTitle>
             </div>
-          )}
-        </div>
-      )}
-    </Card>
+            <DialogDescription>
+              {dialogStep === "install" 
+                ? "First, you need to install the app in your Monday.com workspace."
+                : "Now, authorize Descript to connect with your Monday.com account."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-6">
+            {dialogStep === "install" ? (
+              <div className="space-y-4">
+                <p className="text-sm">
+                  Click the button below to install the Descript app in your Monday.com workspace.
+                  You'll need to have admin permissions in your workspace.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm">
+                  After installing the app, connect your Monday.com account to create items from meeting action items.
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="flex items-center justify-between sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setIsDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            
+            {dialogStep === "install" ? (
+              <Button 
+                onClick={handleInstallApp}
+                className="bg-black hover:bg-gray-800 text-white"
+              >
+                Install App
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleConnectAfterInstall}
+                className="bg-black hover:bg-gray-800 text-white"
+              >
+                Connect Account
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 } 

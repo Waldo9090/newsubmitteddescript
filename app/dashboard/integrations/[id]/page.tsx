@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import DashboardLayout from "../../components/DashboardLayout"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, Zap, X } from "lucide-react"
 import { getFirebaseDb } from "@/lib/firebase"
@@ -69,11 +68,6 @@ const integrationIcons: Record<string, { name: string; iconUrl: string; color: s
     name: "Update HubSpot",
     iconUrl: "/icons/integrations/hubspot.svg",
     color: "#ff7a59",
-  },
-  "monday": {
-    name: "Sync with Monday",
-    iconUrl: "/icons/integrations/Monday.svg",
-    color: "text-blue-500",
   },
 };
 
@@ -468,160 +462,6 @@ export default function AutomationDetailsPage() {
       );
     }
 
-    if (step.type === 'monday' && isEditing) {
-      // Add state for Monday.com board and group
-      const [selectedBoard, setSelectedBoard] = useState(step.config?.board || "");
-      const [selectedGroup, setSelectedGroup] = useState(step.config?.group || "");
-      const [boards, setBoards] = useState<Array<{ id: string; name: string }>>([]);
-      const [groups, setGroups] = useState<Array<{ id: string; title: string }>>([]);
-      
-      // Fetch boards and groups when editing starts
-      useEffect(() => {
-        if (isEditing && step.type === 'monday') {
-          fetchMondayBoards();
-          if (step.config?.board) {
-            fetchMondayGroups(step.config.board);
-          }
-        }
-      }, [isEditing]);
-      
-      // Function to fetch Monday.com boards
-      const fetchMondayBoards = async () => {
-        if (!user?.email) return;
-        
-        try {
-          const response = await fetch('/api/monday/boards', {
-            headers: {
-              'Authorization': `Bearer ${user.email}`
-            }
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.boards) {
-              setBoards(data.boards);
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching Monday.com boards:', error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch Monday.com boards"
-          });
-        }
-      };
-      
-      // Function to fetch Monday.com groups for a board
-      const fetchMondayGroups = async (boardId: string) => {
-        if (!user?.email || !boardId) return;
-        
-        try {
-          const response = await fetch(`/api/monday/groups?boardId=${boardId}`, {
-            headers: {
-              'Authorization': `Bearer ${user.email}`
-            }
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.groups) {
-              setGroups(data.groups);
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching Monday.com groups:', error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch Monday.com groups"
-          });
-        }
-      };
-      
-      // Handle board selection
-      const handleBoardSelection = (boardId: string) => {
-        setSelectedBoard(boardId);
-        setSelectedGroup(""); // Reset group selection
-        fetchMondayGroups(boardId);
-      };
-
-      return (
-        <div className="space-y-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Image src="/icons/integrations/Monday.svg" alt="Monday.com" width={24} height={24} />
-              <h2 className="text-xl font-medium">Create items in monday.com</h2>
-            </div>
-            <Button variant="ghost" onClick={() => setEditingStep(null)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium mb-3">Board</h3>
-              <p className="text-muted-foreground mb-4">Select the board to create items on.</p>
-              <Select 
-                value={selectedBoard}
-                onValueChange={handleBoardSelection}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Choose a board..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {boards.map(board => (
-                    <SelectItem key={board.id} value={board.id}>
-                      {board.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedBoard && (
-              <div>
-                <h3 className="text-lg font-medium mb-3">Group</h3>
-                <p className="text-muted-foreground mb-4">
-                  Select the group where you'd like to create items.
-                </p>
-                <Select
-                  value={selectedGroup}
-                  onValueChange={setSelectedGroup}
-                  disabled={groups.length === 0}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={groups.length === 0 ? "Loading groups..." : "Choose a group..."} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {groups.map(group => (
-                      <SelectItem key={group.id} value={group.id}>
-                        {group.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <Button 
-              onClick={() => handleStepUpdate(stepId, {
-                config: {
-                  ...step.config,
-                  board: selectedBoard,
-                  boardName: boards.find(b => b.id === selectedBoard)?.name,
-                  group: selectedGroup,
-                  groupName: groups.find(g => g.id === selectedGroup)?.title
-                }
-              })}
-              className="w-full"
-              disabled={!selectedBoard || !selectedGroup}
-            >
-              Save Changes
-            </Button>
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div 
         key={stepId}
@@ -633,8 +473,6 @@ export default function AutomationDetailsPage() {
           {step.type === 'slack' && <Image src="/icons/integrations/slack.svg" alt="Slack" width={24} height={24} />}
           {step.type === 'notion' && <Image src="/icons/integrations/notion.svg" alt="Notion" width={24} height={24} />}
           {step.type === 'linear' && <Image src="/icons/integrations/linear.svg" alt="Linear" width={24} height={24} />}
-          {step.type === 'attio' && <Image src="/icons/integrations/Attio.svg" alt="Attio" width={24} height={24} />}
-          {step.type === 'monday' && <Image src="/icons/integrations/Monday.svg" alt="Monday.com" width={24} height={24} />}
           {step.type === 'ai-insights' && <Image src="/icons/integrations/ai-insights.svg" alt="AI Insights" width={24} height={24} />}
         </div>
         <span className="font-medium text-lg">
@@ -642,8 +480,6 @@ export default function AutomationDetailsPage() {
           {step.type === 'slack' && "Send notes to Slack"}
           {step.type === 'notion' && "Update Notion"}
           {step.type === 'linear' && "Create Linear tasks"}
-          {step.type === 'monday' && "Create items in monday.com"}
-          {step.type === 'attio' && step.name}
         </span>
         <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" />
       </div>
@@ -656,42 +492,6 @@ export default function AutomationDetailsPage() {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="p-6 max-w-4xl mx-auto">
-          <div className="flex items-center mb-6">
-            <Button variant="ghost" className="gap-2" onClick={() => router.push('/dashboard/integrations')}>
-              <ChevronLeft className="h-4 w-4" />
-              Back to Automations
-            </Button>
-          </div>
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 w-64 bg-muted rounded"></div>
-            <div className="h-24 w-full bg-muted rounded"></div>
-            <div className="h-24 w-full bg-muted rounded"></div>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (!automation) {
-    return (
-      <DashboardLayout>
-        <div className="p-6 max-w-4xl mx-auto">
-          <div className="flex items-center mb-6">
-            <Button variant="ghost" className="gap-2" onClick={() => router.push('/dashboard/integrations')}>
-              <ChevronLeft className="h-4 w-4" />
-              Back to Automations
-            </Button>
-          </div>
-          <p>Automation not found.</p>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  return (
-    <DashboardLayout>
       <div className="p-6 max-w-4xl mx-auto">
         <div className="flex items-center mb-6">
           <Button variant="ghost" className="gap-2" onClick={() => router.push('/dashboard/integrations')}>
@@ -699,20 +499,50 @@ export default function AutomationDetailsPage() {
             Back to Automations
           </Button>
         </div>
-        
-        <h1 className="text-3xl font-semibold mb-6">{automation.name}</h1>
-        
-        <div className="space-y-6">
-          <h2 className="text-xl font-medium mb-4">Steps</h2>
-          <div className="space-y-4">
-            {automation.steps.map((step) => (
-              <div key={step.id} className="mb-6">
-                {renderStepDetails(step.id, step)}
-              </div>
-            ))}
-          </div>
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-64 bg-muted rounded"></div>
+          <div className="h-24 w-full bg-muted rounded"></div>
+          <div className="h-24 w-full bg-muted rounded"></div>
         </div>
       </div>
-    </DashboardLayout>
+    );
+  }
+
+  if (!automation) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="flex items-center mb-6">
+          <Button variant="ghost" className="gap-2" onClick={() => router.push('/dashboard/integrations')}>
+            <ChevronLeft className="h-4 w-4" />
+            Back to Automations
+          </Button>
+        </div>
+        <p>Automation not found.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto">
+      <div className="flex items-center mb-6">
+        <Button variant="ghost" className="gap-2" onClick={() => router.push('/dashboard/integrations')}>
+          <ChevronLeft className="h-4 w-4" />
+          Back to Automations
+        </Button>
+      </div>
+      
+      <h1 className="text-3xl font-semibold mb-6">{automation.name}</h1>
+      
+      <div className="space-y-6">
+        <h2 className="text-xl font-medium mb-4">Steps</h2>
+        <div className="space-y-4">
+          {automation.steps.map((step) => (
+            <div key={step.id} className="mb-6">
+              {renderStepDetails(step.id, step)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 } 

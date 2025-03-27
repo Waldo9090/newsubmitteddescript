@@ -6,7 +6,7 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID;
 const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET;
 const SLACK_REDIRECT_URI = process.env.SLACK_REDIRECT_URI;
-const BASE_URL = process.env.NEXTAUTH_URL || 'https://localhost:3001';
+const BASE_URL = process.env.NEXTAUTH_URL || 'https://www.aisummarizer-descript.com';
 
 export const dynamic = 'force-dynamic';
 

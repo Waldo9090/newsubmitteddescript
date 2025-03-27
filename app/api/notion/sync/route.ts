@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     // First verify the Notion connection is working
     try {
       console.log('[Notion Sync] Verifying Notion connection...');
-      const user = await notion.users.me();
+      const user = await notion.users.me({});
       console.log('[Notion Sync] Notion connection verified:', {
         name: user.name,
         type: user.type

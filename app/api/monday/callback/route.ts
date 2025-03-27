@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseDb } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { cookies } from 'next/headers';
+
+const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.aisummarizer-descript.com';
 
 export async function GET(request: Request) {
   try {
@@ -17,7 +19,7 @@ export async function GET(request: Request) {
     
     if (state && storedState && state !== storedState) {
       console.error('State mismatch in OAuth callback');
-      return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=invalid_state`);
+      return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=invalid_state`);
     }
     
     // Handle errors from OAuth provider
@@ -26,25 +28,25 @@ export async function GET(request: Request) {
       
       // Handle specific error for app not installed
       if (error === 'access_denied' && errorDescription?.includes('not installed')) {
-        return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=app_not_installed`);
+        return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=app_not_installed`);
       }
       
-      return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=${error}`);
+      return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=${error}`);
     }
 
     if (!code) {
       console.error('No code received from Monday.com');
-      return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=no_code`);
+      return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=no_code`);
     }
 
     // Define Monday.com OAuth parameters
     const MONDAY_CLIENT_ID = process.env.MONDAY_CLIENT_ID;
     const MONDAY_CLIENT_SECRET = process.env.MONDAY_CLIENT_SECRET;
-    const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/monday/callback`;
+    const REDIRECT_URI = `${NEXT_PUBLIC_BASE_URL}/api/monday/callback`;
     
     if (!MONDAY_CLIENT_ID || !MONDAY_CLIENT_SECRET) {
       console.error('Missing Monday.com client credentials');
-      return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=missing_credentials`);
+      return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=missing_credentials`);
     }
 
     // Exchange code for access token
@@ -67,10 +69,10 @@ export async function GET(request: Request) {
       
       // Check if error is related to app not being installed
       if (errorText.includes('not installed') || errorText.includes('install the app')) {
-        return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=app_not_installed`);
+        return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=app_not_installed`);
       }
       
-      return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=token_exchange_failed`);
+      return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=token_exchange_failed`);
     }
 
     const tokenData = await tokenResponse.json();
@@ -91,7 +93,13 @@ export async function GET(request: Request) {
     if (!userResponse.ok) {
       const errorText = await userResponse.text();
       console.error('Failed to get user info:', errorText);
-      return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=user_info_failed`);
+      
+      // Check if error is related to app not being installed
+      if (errorText.includes('not installed') || errorText.includes('install the app')) {
+        return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=app_not_installed`);
+      }
+      
+      return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=user_info_failed`);
     }
 
     const userData = await userResponse.json();
@@ -99,7 +107,7 @@ export async function GET(request: Request) {
 
     if (!userData.data?.me?.account) {
       console.error('Invalid user account data from Monday.com');
-      return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=invalid_account_data`);
+      return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=invalid_account_data`);
     }
 
     // Get email from cookies, which would have been set during the auth flow
@@ -108,28 +116,27 @@ export async function GET(request: Request) {
 
     if (!userEmail) {
       console.error('No user email found in cookies');
-      return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=no_user_email`);
+      return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=no_user_email`);
     }
 
     // Store the token in Firestore
     const db = getFirebaseDb();
-    await setDoc(doc(db, 'users', userEmail), {
-      mondayIntegration: {
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token || '',
-        accountId: userData.data.me.account.id,
-        workspaceId: userData.data.me.account.id,
-        workspaceName: userData.data.me.account.name,
-        expiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null,
-        config: {
-          items: true,
-          boards: true,
-          includeMeetingNotes: true,
-          includeActionItems: true,
-        },
-        updatedAt: serverTimestamp(),
-      }
+    
+    // Update the user's integrations/monday document
+    await setDoc(doc(db, 'users', userEmail, 'integrations', 'monday'), {
+      connected: true,
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token || '',
+      accountId: userData.data.me.account.id,
+      accountName: userData.data.me.account.name,
+      userId: userData.data.me.id,
+      userEmail: userData.data.me.email,
+      userName: userData.data.me.name,
+      expiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null,
+      connectedAt: new Date().toISOString(),
+      updatedAt: serverTimestamp()
     }, { merge: true });
+    
     console.log('Saved Monday.com integration for user:', userEmail);
 
     // Clear OAuth cookies
@@ -137,9 +144,9 @@ export async function GET(request: Request) {
     cookieStore.delete('monday_oauth_state');
 
     // Redirect back to the integrations page
-    return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?success=true&provider=monday`);
+    return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?success=true&provider=monday`);
   } catch (error) {
     console.error('Error in Monday.com callback:', error);
-    return Response.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=unknown`);
+    return Response.redirect(`${NEXT_PUBLIC_BASE_URL}/dashboard/integrations?error=unknown`);
   }
 } 

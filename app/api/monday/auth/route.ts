@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { cookies } from 'next/headers';
 
+// Monday.com OAuth configuration
+const MONDAY_CLIENT_ID = process.env.MONDAY_CLIENT_ID || '9ae3e86e3d7b4b28d319ad66477fdb23';
+const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.aisummarizer-descript.com';
+const REDIRECT_URI = `${NEXT_PUBLIC_BASE_URL}/api/monday/callback`;
+
 export async function GET(request: Request) {
   try {
     // Get the authorization header
@@ -22,17 +27,8 @@ export async function GET(request: Request) {
       secure: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 5, // 5 minutes expiration, enough for OAuth flow
+      maxAge: 60 * 10, // 10 minutes expiration, enough for OAuth flow
     });
-
-    // Define Monday.com OAuth parameters
-    const MONDAY_CLIENT_ID = process.env.MONDAY_CLIENT_ID;
-    if (!MONDAY_CLIENT_ID) {
-      console.error('Missing MONDAY_CLIENT_ID environment variable');
-      return NextResponse.json({ error: 'Missing configuration' }, { status: 500 });
-    }
-    
-    const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/monday/callback`;
     
     // Generate a state parameter for security
     const state = randomBytes(16).toString('hex');
@@ -43,10 +39,10 @@ export async function GET(request: Request) {
       secure: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 5, // 5 minutes expiration
+      maxAge: 60 * 10, // 10 minutes expiration
     });
 
-    // Construct the Monday.com OAuth URL
+    // Standard OAuth URL for authorization
     const authUrl = `https://auth.monday.com/oauth2/authorize?` + new URLSearchParams({
       client_id: MONDAY_CLIENT_ID,
       redirect_uri: REDIRECT_URI,
@@ -57,9 +53,8 @@ export async function GET(request: Request) {
     console.log('Generated Monday auth URL:', authUrl);
 
     return NextResponse.json({ 
-      url: authUrl, 
-      state,
-      message: "You'll be redirected to Monday.com. If prompted, please install the Descript app before authorizing."
+      url: authUrl,
+      message: "Ready to connect to Monday.com."
     });
   } catch (error: any) {
     console.error('Error in Monday auth:', error);

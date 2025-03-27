@@ -6,10 +6,11 @@ const next = require('next');
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
+const DOMAIN = 'www.aisummarizer-descript.com';
 
 const options = {
-  key: fs.readFileSync('./certificates/localhost-key.pem'),
-  cert: fs.readFileSync('./certificates/localhost.pem')
+  key: fs.readFileSync('./key.pem'),
+  cert: fs.readFileSync('./cert.pem')
 };
 
 app.prepare().then(() => {
@@ -18,6 +19,6 @@ app.prepare().then(() => {
     handle(req, res, parsedUrl);
   }).listen(3001, err => {
     if (err) throw err;
-    console.log('> Ready on https://localhost:3001');
+    console.log(`> Ready on https://${DOMAIN}`);
   });
 }); 

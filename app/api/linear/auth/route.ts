@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 const LINEAR_CLIENT_ID = process.env.LINEAR_CLIENT_ID;
-const BASE_URL = process.env.NEXTAUTH_URL || 'https://localhost:3003';
+const BASE_URL = process.env.NEXTAUTH_URL || 'https://www.aisummarizer-descript.com';
 const REDIRECT_URI = `${BASE_URL}/api/linear/callback`;
 
 // Define required scopes according to Linear's documentation

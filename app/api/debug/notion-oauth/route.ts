@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Set default redirect URI if not provided
-    const finalRedirectUri = redirectUri || process.env.NOTION_REDIRECT_URI || 'https://localhost:3001/api/notion/callback';
+    const finalRedirectUri = redirectUri || process.env.NOTION_REDIRECT_URI || 'https://www.aisummarizer-descript.com/api/notion/callback';
     
     console.log('Exchanging code for access token using redirect URI:', finalRedirectUri);
     

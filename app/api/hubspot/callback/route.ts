@@ -4,7 +4,7 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 const HUBSPOT_CLIENT_ID = process.env.HUBSPOT_CLIENT_ID;
 const HUBSPOT_CLIENT_SECRET = process.env.HUBSPOT_CLIENT_SECRET;
-const BASE_URL = process.env.NEXTAUTH_URL || 'https://localhost:3001';
+const BASE_URL = process.env.NEXTAUTH_URL || 'https://www.aisummarizer-descript.com';
 const REDIRECT_URI = `${BASE_URL}/api/hubspot/callback`;
 
 export async function GET(request: Request) {

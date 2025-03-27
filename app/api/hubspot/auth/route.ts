@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 const HUBSPOT_CLIENT_ID = process.env.HUBSPOT_CLIENT_ID;
-const BASE_URL = process.env.NEXTAUTH_URL || 'https://localhost:3001';
+const BASE_URL = process.env.NEXTAUTH_URL || 'https://www.aisummarizer-descript.com';
 const REDIRECT_URI = `${BASE_URL}/api/hubspot/callback`;
 
 // Define required scopes according to HubSpot's documentation

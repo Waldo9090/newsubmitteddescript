@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 import { getFirebaseDb } from "@/lib/firebase";
@@ -98,6 +97,24 @@ export default function SalesforceConnection() {
     }
   };
 
+  const handleDisconnect = async () => {
+    if (!user?.email) return;
+
+    try {
+      const db = getFirebaseDb();
+      
+      await setDoc(doc(db, 'users', user.email), {
+        salesforceIntegration: null
+      }, { merge: true });
+      
+      setIsConnected(false);
+      toast.success('Successfully disconnected from Salesforce');
+    } catch (error) {
+      console.error('Error disconnecting from Salesforce:', error);
+      toast.error('Failed to disconnect from Salesforce');
+    }
+  };
+
   const handleSaveConfig = async () => {
     if (!user?.email) return;
 
@@ -119,41 +136,55 @@ export default function SalesforceConnection() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Connect Salesforce</CardTitle>
-        <CardDescription>
-          Sync meetings and action items with your Salesforce workspace
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="h-10 w-10 rounded-lg bg-[#00A1E0] flex items-center justify-center">
-              <Image
-                src="/icons/integrations/salesforce.svg"
-                alt="Salesforce"
-                width={24}
-                height={24}
-                className="text-white"
-              />
-            </div>
-            <div>
-              <h4 className="text-sm font-medium">Salesforce</h4>
-              <p className="text-sm text-muted-foreground">
-                {isConnected ? 'Connected' : 'Not connected'}
-              </p>
-            </div>
+    <div className="space-y-6 bg-card p-6 rounded-lg border border-border">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <div className="h-8 w-8 rounded-lg bg-[#00A1E0] flex items-center justify-center">
+            <Image
+              src="/icons/integrations/salesforce.svg"
+              alt="Salesforce"
+              width={24}
+              height={24}
+              className="text-white"
+            />
           </div>
-          <Button
-            onClick={isConnected ? () => setShowConfigDialog(true) : handleConnect}
-            variant={isConnected ? "outline" : "default"}
-            disabled={isConnecting}
-          >
-            {isConnecting ? "Connecting..." : isConnected ? "Configure" : "Connect"}
-          </Button>
+          <div>
+            <h4 className="text-sm font-medium">Salesforce</h4>
+            <p className="text-sm text-muted-foreground">
+              {isConnected ? 'Connected' : 'Not connected'}
+            </p>
+          </div>
         </div>
-      </CardContent>
+        {isConnected ? (
+          <div className="flex space-x-2">
+            <Button
+              onClick={() => setShowConfigDialog(true)}
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+            >
+              Configure
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={handleDisconnect}
+            >
+              Disconnect
+            </Button>
+          </div>
+        ) : (
+          <Button
+            onClick={handleConnect}
+            variant="default"
+            disabled={isConnecting}
+            className="rounded-full"
+          >
+            {isConnecting ? "Connecting..." : "Connect"}
+          </Button>
+        )}
+      </div>
 
       <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
         <DialogContent className="sm:max-w-[425px]">
@@ -236,6 +267,6 @@ export default function SalesforceConnection() {
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 } 

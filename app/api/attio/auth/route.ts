@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
+import { cookies } from 'next/headers';
+
+// Attio OAuth configuration
+const ATTIO_CLIENT_ID = process.env.ATTIO_CLIENT_ID || 'b98e1808-8a21-4ac6-94af-e2fb4dfc79ce';
+const REDIRECT_URI = process.env.NEXT_PUBLIC_BASE_URL 
+  ? `${process.env.NEXT_PUBLIC_BASE_URL}/api/attio/callback`
+  : 'https://www.aisummarizer-descript.com/api/attio/callback';
 
 export async function GET(request: Request) {
   try {
@@ -14,51 +21,44 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Verify environment variables
-    const ATTIO_CLIENT_ID = process.env.ATTIO_CLIENT_ID;
-    const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
+    // Store the user email in a cookie for later retrieval in the callback
+    const cookieStore = cookies();
+    cookieStore.set('attio_user_email', userEmail, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 10, // 10 minutes expiration, enough for OAuth flow
+    });
     
-    if (!ATTIO_CLIENT_ID || !BASE_URL) {
-      console.error('Missing required environment variables:', {
-        hasClientId: !!ATTIO_CLIENT_ID,
-        hasBaseUrl: !!BASE_URL
-      });
-      return NextResponse.json({ error: 'Missing required configuration' }, { status: 500 });
-    }
-
-    // Generate a state parameter for security
+    // Generate a state parameter for security (CSRF protection)
     const state = randomBytes(16).toString('hex');
+    
+    // Store the state in a cookie for verification in the callback
+    cookieStore.set('attio_oauth_state', state, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 10, // 10 minutes expiration
+    });
 
-    // Define scopes exactly as configured in Attio settings
-    const scopes = [
-      'read_user_management',     // View workspace members
-      'read_public_collections',  // View public collections
-      'read_records',            // Records (Read-write)
-      'write_records',           // Records (Read-write)
-      'read_configuration',      // Object Configuration (Read)
-      'read_notes',             // Notes (Read-write)
-      'write_notes',            // Notes (Read-write)
-      'read_tasks',             // Tasks (Read-write)
-      'write_tasks'             // Tasks (Read-write)
-    ];
-
-    console.log('Generating Attio auth URL with scopes:', scopes);
-
-    // Construct the Attio OAuth URL with prompt=consent to force workspace selection
-    const authUrl = `https://app.attio.com/oauth/authorize?` + new URLSearchParams({
+    // Construct the authorization URL for Attio
+    const authUrl = `https://app.attio.com/authorize?` + new URLSearchParams({
       client_id: ATTIO_CLIENT_ID,
-      redirect_uri: `${BASE_URL}/api/attio/callback`,
+      redirect_uri: REDIRECT_URI,
       response_type: 'code',
-      scope: scopes.join(' '),
       state: state,
-      prompt: 'consent'  // Force the consent screen to show
     }).toString();
 
-    console.log('Generated auth URL:', authUrl.replace(ATTIO_CLIENT_ID, '********'));
+    console.log('Generated Attio authorization URL:', authUrl);
 
-    return NextResponse.json({ url: authUrl, state });
+    return NextResponse.json({ 
+      url: authUrl,
+      message: "Ready to connect to Attio."
+    });
   } catch (error: any) {
-    console.error('Error in Attio auth:', error);
+    console.error('Error in Attio auth route:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

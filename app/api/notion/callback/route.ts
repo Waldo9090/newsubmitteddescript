@@ -6,7 +6,7 @@ import { getFirebaseDb } from '@/lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 export async function GET(request: NextRequest) {
-  const baseUrl = process.env.NEXTAUTH_URL || 'https://localhost:3001';
+  const baseUrl = process.env.NEXTAUTH_URL || 'https://www.aisummarizer-descript.com';
   console.log('Notion callback received with params:', request.nextUrl.searchParams.toString());
   console.log('Using base URL:', baseUrl);
   

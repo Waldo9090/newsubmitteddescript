@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   
   try {
     // Get the base URL from environment or default to localhost
-    const baseUrl = process.env.NEXTAUTH_URL || 'https://localhost:3001';
+    const baseUrl = process.env.NEXTAUTH_URL || 'https://www.aisummarizer-descript.com';
     console.log('Using base URL:', baseUrl);
     
     // Get the user email from the authorization header

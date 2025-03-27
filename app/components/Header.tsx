@@ -35,9 +35,9 @@ export default function Header() {
   }
 
   const menuItems = [
-    { href: "/releases", label: "Releases" },
-    { href: "/pricing", label: "Pricing" },
-    { href: "/privacy", label: "Privacy" },
+    { href: "/releases" as const, label: "Releases" },
+    { href: "/pricing" as const, label: "Pricing" },
+    { href: "/privacy" as const, label: "Privacy" },
   ]
 
   return (

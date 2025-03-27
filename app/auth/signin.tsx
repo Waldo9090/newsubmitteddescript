@@ -9,12 +9,8 @@ export default function SignIn() {
 
   const handleSignIn = async () => {
     try {
-      const credential = await signInWithGoogle();
-      if (credential && credential.user) {
-        router.push('/dashboard');
-      } else {
-        console.error("Authentication failed: No user returned");
-      }
+      await signInWithGoogle();
+      router.push('/dashboard');
     } catch (error: any) {
       if (error.code === "auth/cancelled-popup-request") {
         console.warn("Popup sign in cancelled by user.");

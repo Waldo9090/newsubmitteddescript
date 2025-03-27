@@ -9,7 +9,7 @@ export default function BillingSettings() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold mb-2">Circleback for Individuals</h2>
+        <h2 className="text-xl font-semibold mb-2">Descript for Individuals</h2>
         <p className="text-muted-foreground mb-6">Your free trial ends on March 14th, 2025.</p>
         <Button variant="secondary">Manage billing</Button>
       </div>
@@ -35,8 +35,7 @@ export default function BillingSettings() {
       <div>
         <h2 className="text-xl font-semibold mb-2">Referrals</h2>
         <p className="text-muted-foreground mb-6">
-          You earn a free month of Circleback for each person who joins through your referral link or meeting
-          notes emails.
+         
         </p>
 
         <Button variant="outline" className="gap-2">

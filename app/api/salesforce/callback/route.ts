@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const SALESFORCE_CLIENT_ID = process.env.SALESFORCE_CLIENT_ID;
 const SALESFORCE_CLIENT_SECRET = process.env.SALESFORCE_CLIENT_SECRET;
-const BASE_URL = process.env.NEXTAUTH_URL || 'https://localhost:3001';
+const BASE_URL = process.env.NEXTAUTH_URL || 'https://www.aisummarizer-descript.com';
 const REDIRECT_URI = `${BASE_URL}/api/salesforce/callback`;
 
 export async function GET(request: Request) {

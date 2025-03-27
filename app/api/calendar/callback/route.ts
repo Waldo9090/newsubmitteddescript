@@ -38,7 +38,8 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.redirect(new URL('/dashboard/settings', request.url));
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://www.aisummarizer-descript.com';
+    return NextResponse.redirect(`${baseUrl}/dashboard/settings`);
   } catch (error) {
     console.error('Error handling callback:', error);
     return NextResponse.json({ error: 'Failed to handle callback' }, { status: 500 });

@@ -6,7 +6,7 @@ import { doc, setDoc } from 'firebase/firestore';
 
 const LINEAR_CLIENT_ID = process.env.LINEAR_CLIENT_ID;
 const LINEAR_CLIENT_SECRET = process.env.LINEAR_CLIENT_SECRET;
-const BASE_URL = process.env.NEXTAUTH_URL || 'https://localhost:3003';
+const BASE_URL = process.env.NEXTAUTH_URL || 'https://www.aisummarizer-descript.com';
 const REDIRECT_URI = `${BASE_URL}/api/linear/callback`;
 
 export async function GET(request: Request) {
