@@ -1,4 +1,9 @@
-const ChatMessage = ({ role, content }) => {
+interface ChatMessageProps {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+const ChatMessage = ({ role, content }: ChatMessageProps) => {
   return (
     <div className={`flex w-full ${role === 'assistant' ? 'justify-end' : 'justify-start'}`}>
       <div
@@ -12,4 +17,6 @@ const ChatMessage = ({ role, content }) => {
       </div>
     </div>
   );
-}; 
+};
+
+export default ChatMessage; 

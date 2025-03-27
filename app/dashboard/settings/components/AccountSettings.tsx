@@ -68,9 +68,9 @@ export default function AccountSettings() {
           <SlackConnection onBack={handleBack} />
           <LinearConnection />
           <HubSpotConnection />
-          <MondayConnection onBack={handleBack} forceStatus={isLoading ? "loading" : undefined} />
-          <AttioConnection onBack={handleBack} forceStatus={isLoading ? "loading" : undefined} />
-          <SalesforceConnection onBack={handleBack} forceStatus={isLoading ? "loading" : undefined} />
+          <MondayConnection onClose={handleBack} forceStatus={isLoading ? "loading" : undefined} />
+          <AttioConnection onClose={handleBack} forceStatus={isLoading ? "loading" : undefined} />
+          <SalesforceConnection />
         </div>
       </div>
     </div>

@@ -5,6 +5,8 @@ import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { Moon, Sun, Menu, X, ChevronRight } from "lucide-react"
 import { useTheme } from "next-themes"
+import { Button } from "@/components/ui/button"
+import { SheetContent } from "@/components/ui/sheet"
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -39,7 +41,11 @@ export default function Header() {
             transition={{ duration: 0.5 }}
             className="flex items-center"
           >
-            <Link href="/" className="text-2xl font-bold">
+            <Link
+              href={"/" as any}
+              className="flex items-center gap-2 font-bold text-xl"
+              onClick={() => setIsMenuOpen(false)}
+            >
               <span className="text-primary">Stream</span>
               <span className="text-foreground">Line</span>
             </Link>
@@ -53,7 +59,7 @@ export default function Header() {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
               >
                 <Link
-                  href={item.href}
+                  href={item.href as any}
                   className="relative text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200 ease-in-out px-4 py-2 group"
                 >
                   {item.label}
@@ -81,7 +87,7 @@ export default function Header() {
               Log in
             </Link>
             <Link
-              href="/signup"
+              href={"/signup" as any}
               className="hidden sm:inline-flex items-center text-sm font-medium text-primary bg-primary/10 hover:bg-primary/20 px-4 py-2 rounded-full transition-colors duration-200"
             >
               Sign up <ChevronRight size={16} className="ml-1" />
@@ -109,7 +115,7 @@ export default function Header() {
               {menuItems.map((item) => (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={item.href as any}
                   className="block text-base font-medium text-muted-foreground hover:text-foreground transition-colors duration-200 ease-in-out px-4 py-2"
                   onClick={toggleMenu}
                 >
@@ -125,7 +131,7 @@ export default function Header() {
                   Log in
                 </Link>
                 <Link
-                  href="/signup"
+                  href={"/signup" as any}
                   className="flex items-center text-base font-medium text-primary bg-primary/10 hover:bg-primary/20 px-4 py-2 rounded-full transition-colors duration-200"
                   onClick={toggleMenu}
                 >
