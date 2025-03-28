@@ -36,9 +36,9 @@ interface MondayConnectionProps {
   savedConfig?: any;
 }
 
-// Direct links for installation and authorization
-const MONDAY_INSTALL_URL = "https://auth.monday.com/oauth2/authorize?client_id=9ae3e86e3d7b4b28d319ad66477fdb23&response_type=install&redirect_uri=https://www.aisummarizer-descript.com/api/monday/callback";
-const MONDAY_AUTH_URL = "https://auth.monday.com/oauth2/authorize?client_id=9ae3e86e3d7b4b28d319ad66477fdb23&redirect_uri=https://www.aisummarizer-descript.com/api/monday/callback";
+// Direct links for installation and authorization - we'll get these from the API
+// const MONDAY_INSTALL_URL = "https://auth.monday.com/oauth2/authorize?client_id=9ae3e86e3d7b4b28d319ad66477fdb23&response_type=install&redirect_uri=https://www.aisummarizer-descript.com/api/monday/callback";
+// const MONDAY_AUTH_URL = "https://auth.monday.com/oauth2/authorize?client_id=9ae3e86e3d7b4b28d319ad66477fdb23&redirect_uri=https://www.aisummarizer-descript.com/api/monday/callback";
 
 export default function MondayConnection({ 
   onSave,
@@ -63,6 +63,10 @@ export default function MondayConnection({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogStep, setDialogStep] = useState<"install" | "connect">("install");
   const [redirectUrl, setRedirectUrl] = useState("");
+
+  // State for URLs
+  const [installUrl, setInstallUrl] = useState("");
+  const [authUrl, setAuthUrl] = useState("");
 
   // Check connection status on component mount
   useEffect(() => {
@@ -327,11 +331,11 @@ export default function MondayConnection({
     }
   }, []);
 
-  // Get a redirect URL with proper callback path for the API
-  const getApiRedirectUrl = async () => {
+  // Get API URLs when the dialog opens
+  const getApiUrls = async () => {
     if (!user?.email) {
       toast.error('Please sign in to connect Monday.com');
-      return null;
+      return false;
     }
 
     try {
@@ -348,11 +352,21 @@ export default function MondayConnection({
       }
       
       const { url } = await response.json();
-      return url;
+      
+      // Set for Connect button
+      setAuthUrl(url);
+      
+      // Create install URL by adding response_type=install
+      const installUrlObj = new URL(url);
+      installUrlObj.searchParams.set('response_type', 'install');
+      setInstallUrl(installUrlObj.toString());
+      
+      console.log('Got URLs from API:', { authUrl: url, installUrl: installUrlObj.toString() });
+      return true;
     } catch (error) {
       console.error('Error getting Monday.com URLs:', error);
       toast.error('Failed to get Monday.com connection information');
-      return null;
+      return false;
     }
   };
 
@@ -361,17 +375,19 @@ export default function MondayConnection({
     setDialogStep("install");
     setIsDialogOpen(true);
     
-    // Get the proper redirect URL for later
-    const url = await getApiRedirectUrl();
-    if (url) {
-      setRedirectUrl(url);
-    }
+    // Get the proper URLs
+    await getApiUrls();
   };
 
   // Handle app installation
   const handleInstallApp = () => {
+    if (!installUrl) {
+      toast.error('Failed to get installation URL. Please try again.');
+      return;
+    }
+    
     // Open the installation URL in a new window
-    window.open(MONDAY_INSTALL_URL, '_blank');
+    window.open(installUrl, '_blank');
     
     // Now switch to the connect step
     setDialogStep("connect");
@@ -380,13 +396,13 @@ export default function MondayConnection({
 
   // Handle connection after installation
   const handleConnectAfterInstall = () => {
-    if (redirectUrl) {
-      // Use the redirect URL from our API (with proper state/cookies setup)
-      window.location.href = redirectUrl;
-    } else {
-      // Fallback to direct auth URL if API redirect failed
-      window.location.href = MONDAY_AUTH_URL;
+    if (!authUrl) {
+      toast.error('Failed to get authorization URL. Please try again.');
+      return;
     }
+    
+    // Use the redirect URL from our API (with proper state/cookies setup)
+    window.location.href = authUrl;
     setIsDialogOpen(false);
   };
 
