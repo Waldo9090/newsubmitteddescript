@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, CheckCircle2, Circle, MoreHorizontal } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { 
   DropdownMenu, 
@@ -16,6 +16,10 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 interface ActionItem {
   title: string;
@@ -68,6 +72,9 @@ export default function ActionItemsPage() {
   const [actionItems, setActionItems] = useState<SingleActionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
+  const [editingItem, setEditingItem] = useState<SingleActionItem | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   useEffect(() => {
     const fetchActionItems = async () => {
@@ -178,6 +185,50 @@ export default function ActionItemsPage() {
     }
   };
 
+  const handleSaveEdit = async () => {
+    if (!user?.email || !editingItem) return;
+
+    try {
+      const db = getFirebaseDb();
+      const meetingRef = doc(db, "transcript", user.email, "timestamps", editingItem.meetingId);
+
+      // Update the meetings state
+      const updatedMeetings = meetings.map((meeting) => {
+        if (meeting.id === editingItem.meetingId) {
+          const updatedItems = { ...meeting.actionItems };
+          updatedItems[editingItem.itemIndex] = {
+            ...updatedItems[editingItem.itemIndex],
+            text: editTitle, // Update both text and title for compatibility
+            title: editTitle,
+            description: editDescription
+          };
+          return { ...meeting, actionItems: updatedItems };
+        }
+        return meeting;
+      });
+
+      // Update Firestore
+      const targetMeeting = updatedMeetings.find((m) => m.id === editingItem.meetingId);
+      if (targetMeeting) {
+        await updateDoc(meetingRef, { actionItems: targetMeeting.actionItems });
+      }
+
+      // Update local actionItems state
+      const updatedActionItems = actionItems.map((item) => {
+        if (item.meetingId === editingItem.meetingId && item.itemIndex === editingItem.itemIndex) {
+          return { ...item, title: editTitle, description: editDescription };
+        }
+        return item;
+      });
+
+      setMeetings(updatedMeetings);
+      setActionItems(updatedActionItems);
+      setEditingItem(null);
+    } catch (error) {
+      console.error("Error updating action item:", error);
+    }
+  };
+
   // Filter action items based on the current filter
   const filteredActionItems = actionItems.filter(item => {
     if (filter === "all") return true;
@@ -194,12 +245,12 @@ export default function ActionItemsPage() {
 
   if (loading) {
     return (
-      <div className="p-8 min-h-screen bg-background">
+      <div className="p-8 min-h-screen bg-white">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold mb-8 text-foreground">Action Items</h1>
           <div className="space-y-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 bg-gray-200 dark:bg-gray-800 animate-pulse rounded-xl"></div>
+              <div key={i} className="h-24 bg-gray-100 dark:bg-gray-800 animate-pulse rounded-lg"></div>
             ))}
           </div>
         </div>
@@ -208,12 +259,12 @@ export default function ActionItemsPage() {
   }
 
   return (
-    <div className="p-8 min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="p-8 min-h-screen bg-white dark:bg-gray-950">
       <div className="max-w-4xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
             Action Items 
-            <span className="ml-3 text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 py-1 px-2.5 rounded-full">
+            <span className="ml-3 text-sm font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 py-1 px-2.5 rounded-full">
               {filteredActionItems.length}
             </span>
           </h1>
@@ -221,21 +272,33 @@ export default function ActionItemsPage() {
           <div className="flex space-x-2">
             <Badge 
               variant={filter === "all" ? "default" : "outline"} 
-              className={`cursor-pointer px-3 py-1 rounded-full text-sm ${filter === "all" ? 'bg-purple-600 hover:bg-purple-700' : 'hover:bg-purple-50 hover:text-purple-700'}`}
+              className={`cursor-pointer px-3 py-1 rounded-full text-sm ${
+                filter === "all" 
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
+                  : 'hover:bg-gray-50 hover:text-gray-700'
+              }`}
               onClick={() => setFilter("all")}
             >
               All
             </Badge>
             <Badge 
               variant={filter === "pending" ? "default" : "outline"} 
-              className={`cursor-pointer px-3 py-1 rounded-full text-sm ${filter === "pending" ? 'bg-purple-600 hover:bg-purple-700' : 'hover:bg-purple-50 hover:text-purple-700'}`}
+              className={`cursor-pointer px-3 py-1 rounded-full text-sm ${
+                filter === "pending" 
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
+                  : 'hover:bg-gray-50 hover:text-gray-700'
+              }`}
               onClick={() => setFilter("pending")}
             >
               Pending
             </Badge>
             <Badge 
               variant={filter === "completed" ? "default" : "outline"} 
-              className={`cursor-pointer px-3 py-1 rounded-full text-sm ${filter === "completed" ? 'bg-purple-600 hover:bg-purple-700' : 'hover:bg-purple-50 hover:text-purple-700'}`}
+              className={`cursor-pointer px-3 py-1 rounded-full text-sm ${
+                filter === "completed" 
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
+                  : 'hover:bg-gray-50 hover:text-gray-700'
+              }`}
               onClick={() => setFilter("completed")}
             >
               Completed
@@ -244,117 +307,125 @@ export default function ActionItemsPage() {
         </div>
 
         {filteredActionItems.length === 0 ? (
-          <Card className="p-12 text-center border border-border bg-white dark:bg-gray-900 shadow-sm rounded-xl">
+          <div className="p-12 text-center bg-white dark:bg-gray-900">
             <div className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mb-4">
-                <CheckCircle2 className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle2 className="h-8 w-8 text-gray-600 dark:text-gray-400" />
               </div>
-              <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
-                {filter === "all" 
-                  ? "No action items found" 
-                  : filter === "pending" 
-                    ? "No pending action items" 
-                    : "No completed action items"}
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+                No action items found
               </h3>
-              <p className="text-muted-foreground max-w-md">
-                {filter === "all" 
-                  ? "Action items from your meetings will appear here." 
-                  : filter === "pending" 
-                    ? "All your action items have been completed! Great job!" 
-                    : "You haven't completed any action items yet."}
+              <p className="text-gray-500 dark:text-gray-400">
+                {filter === "completed" 
+                  ? "You haven't completed any action items yet."
+                  : filter === "pending"
+                    ? "You don't have any pending action items."
+                    : "Start by recording or importing a meeting."}
               </p>
             </div>
-          </Card>
+          </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-0">
             {filteredActionItems.map((item, index) => (
-              <Card 
-                key={`${item.meetingId}-${item.itemIndex}`} 
-                className={cn(
-                  "border border-border bg-white dark:bg-gray-900 shadow-sm hover:shadow transition-all duration-200 rounded-xl overflow-hidden",
-                  item.done && "bg-gray-50/80 dark:bg-gray-900/50"
-                )}
+              <div
+                key={`${item.meetingId}-${item.itemIndex}`}
+                className="py-6 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
               >
-                <div className="flex items-start p-5 gap-4">
+                <div className="flex items-start gap-4">
                   <div className="flex-shrink-0 pt-1">
                     <Checkbox
                       checked={item.done}
-                      onCheckedChange={() =>
-                        handleToggleActionItem(item.meetingId, item.itemIndex, item.done)
-                      }
+                      onCheckedChange={() => handleToggleActionItem(item.meetingId, item.itemIndex, item.done)}
                       className={cn(
-                        "h-6 w-6 rounded-full border-2",
+                        "h-5 w-5 rounded-full border-2",
                         item.done 
-                          ? "border-purple-500 bg-purple-500 text-white" 
-                          : "border-gray-300 dark:border-gray-600"
+                          ? "bg-purple-100 border-purple-200 text-purple-500" 
+                          : "border-gray-300"
                       )}
                     />
                   </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                      <h3
-                        className={cn(
-                          "text-lg font-medium text-gray-900 dark:text-gray-100",
-                          item.done && "line-through text-gray-500 dark:text-gray-400"
-                        )}
-                      >
-                        {item.title}
-                      </h3>
-                      
-                      <div className="flex items-center gap-2">
-                        {item.meetingTimestamp && (
-                          <div className="flex items-center text-xs text-muted-foreground bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-full">
-                            <Calendar className="h-3 w-3 mr-1.5 text-purple-500 dark:text-purple-400" />
-                            {formatDate(item.meetingTimestamp)}
-                          </div>
-                        )}
-                        
-                        <DropdownMenu>
-                          <DropdownMenuTrigger className="flex items-center justify-center h-8 w-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
-                            <MoreHorizontal className="h-4 w-4 text-gray-500" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem 
-                              onClick={() => handleToggleActionItem(item.meetingId, item.itemIndex, item.done)}
-                            >
-                              {item.done ? "Mark as incomplete" : "Mark as complete"}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                  <div 
+                    className="flex-1 min-w-0 cursor-pointer"
+                    onClick={() => {
+                      setEditingItem(item);
+                      setEditTitle(item.title);
+                      setEditDescription(item.description);
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className={cn(
+                          "text-base font-medium mb-1",
+                          item.done 
+                            ? "text-gray-500 line-through" 
+                            : "text-gray-900 dark:text-white"
+                        )}>
+                          {item.title}
+                        </h3>
+                        <p className={cn(
+                          "text-sm",
+                          item.done 
+                            ? "text-gray-400" 
+                            : "text-gray-600 dark:text-gray-300"
+                        )}>
+                          {item.description}
+                        </p>
                       </div>
                     </div>
-                    
-                    {item.description && (
-                      <p
-                        className={cn(
-                          "text-base text-gray-700 dark:text-gray-300 mt-2",
-                          item.done && "line-through text-gray-500 dark:text-gray-400 opacity-70"
-                        )}
-                      >
-                        {item.description}
-                      </p>
-                    )}
-                    
-                    <div className="flex items-center mt-3 text-sm text-muted-foreground">
-                      <div className="flex items-center">
-                        {item.done ? (
-                          <CheckCircle2 className="h-4 w-4 mr-1.5 text-green-500" />
-                        ) : (
-                          <Circle className="h-4 w-4 mr-1.5 text-yellow-500" />
-                        )}
-                        <span>{item.done ? "Completed" : "In progress"}</span>
+                    <div className="mt-2 flex items-center gap-4">
+                      <div className="text-sm text-gray-500">
+                        From <span className="text-gray-700">{item.meetingTitle}</span>
                       </div>
-                      <span className="mx-2">•</span>
-                      <span>From: {item.meetingTitle}</span>
                     </div>
                   </div>
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Action Item</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="title" className="text-sm font-medium">
+                Title
+              </label>
+              <Input
+                id="title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="description" className="text-sm font-medium">
+                Description
+              </label>
+              <Textarea
+                id="description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                className="w-full"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingItem(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit}>
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
