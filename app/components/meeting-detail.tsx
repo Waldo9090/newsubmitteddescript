@@ -858,117 +858,22 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
               )}
             </div>
             
-            {/* Action Items Section - Improved styling */}
-            <div className="flex-none p-6 border-b bg-white dark:bg-slate-900">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center">
-                  <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 h-6 w-6 rounded-full flex items-center justify-center mr-2 text-xs">
-                    {meeting.actionItems?.length || 0}
-                  </span>
-                  Action Items
-                </h3>
-                <Button onClick={() => setShowCreateActionItem(true)} variant="outline" size="sm" className="rounded-full border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                  <Plus className="h-4 w-4 mr-2 text-purple-600 dark:text-purple-400" />
-                  Create Action Item
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {meeting.actionItems?.length > 0 ? (
-                  meeting.actionItems.map((item) => (
-                    <motion.div 
-                      key={item.id} 
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="flex items-start space-x-2 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
-                    >
-                      <Checkbox 
-                        checked={item.done} 
-                        onCheckedChange={async () => {
-                          if (!user?.email) return;
-                          try {
-                            const updatedActionItems = meeting.actionItems.map(ai => 
-                              ai.id === item.id ? { ...ai, done: !ai.done } : ai
-                            );
-                            
-                            // Update in Firestore
-                            const meetingRef = doc(getFirebaseDb(), 'transcript', user.email, 'timestamps', meeting.id);
-                            await updateDoc(meetingRef, {
-                              actionItems: updatedActionItems
-                            });
-                            
-                            // Update local state
-                            setMeeting({ ...meeting, actionItems: updatedActionItems });
-                            
-                            toast({
-                              title: item.done ? "Action item uncompleted" : "Action item completed",
-                              description: item.title,
-                            });
-                          } catch (error) {
-                            console.error('Error updating action item:', error);
-                            toast({
-                              title: "Error updating action item",
-                              description: "Failed to update the action item status",
-                              variant: "destructive",
-                            });
-                          }
-                        }}
-                        className={cn(
-                          "h-5 w-5 rounded-full border-2",
-                          item.done 
-                            ? "border-purple-500 bg-purple-500 text-white" 
-                            : "border-gray-300 dark:border-gray-600"
-                        )}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className={cn(
-                          "text-sm font-medium text-gray-900 dark:text-gray-100",
-                          item.done && "line-through text-gray-500 dark:text-gray-400"
-                        )}>
-                          {item.title}
-                        </p>
-                        {item.description && (
-                          <p className={cn(
-                            "text-sm text-muted-foreground mt-1",
-                            item.done && "line-through"
-                          )}>
-                            {item.description}
-                          </p>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))
-                ) : (
-                  <div className="text-sm text-muted-foreground text-center py-6 bg-gray-50/50 dark:bg-gray-900/30 rounded-lg border border-dashed border-gray-200 dark:border-gray-800">
-                    <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mb-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="text-purple-600 dark:text-purple-400">
-                          <path d="M12 20h9"></path>
-                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                        </svg>
-                      </div>
-                      <p>No action items for this meeting</p>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setShowCreateActionItem(true)} 
-                        className="mt-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
-                      >
-                        <Plus className="h-3.5 w-3.5 mr-1.5" />
-                        Add your first action item
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Main Content - Fill remaining height */}
             <div className="flex-1 overflow-hidden">
               <Tabs defaultValue="playback" className="h-full flex flex-col">
-                <TabsList className="mx-6 mt-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-full">
-                  <TabsTrigger value="playback" className="rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700">Playback</TabsTrigger>
-                  <TabsTrigger value="summaries" className="rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700">Summaries</TabsTrigger>
+                <TabsList className="mx-6 mt-4 w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
+                  <TabsTrigger
+                    value="playback"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                  >
+                    Playback
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="summaries"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                  >
+                    Summaries
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="playback" className="flex-1 overflow-y-auto p-6">
@@ -1056,6 +961,111 @@ export function MeetingDetail({ meeting: initialMeeting, onClose, onDelete, full
 
                 <TabsContent value="summaries" className="flex-1 overflow-y-auto p-6">
                   <div className="space-y-8">
+                    {/* Action Items Section - Improved styling and moved inside Summaries tab */}
+                    <div className="p-6 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold flex items-center">
+                          <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 h-6 w-6 rounded-full flex items-center justify-center mr-2 text-xs">
+                            {meeting.actionItems?.length || 0}
+                          </span>
+                          Action Items
+                        </h3>
+                        <Button onClick={() => setShowCreateActionItem(true)} variant="outline" size="sm" className="rounded-full border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                          <Plus className="h-4 w-4 mr-2 text-purple-600 dark:text-purple-400" />
+                          Create Action Item
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        {meeting.actionItems?.length > 0 ? (
+                          meeting.actionItems.map((item) => (
+                            <motion.div 
+                              key={item.id} 
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="flex items-start space-x-2 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                            >
+                              <Checkbox 
+                                checked={item.done} 
+                                onCheckedChange={async () => {
+                                  if (!user?.email) return;
+                                  try {
+                                    const updatedActionItems = meeting.actionItems.map(ai => 
+                                      ai.id === item.id ? { ...ai, done: !ai.done } : ai
+                                    );
+                                    
+                                    // Update in Firestore
+                                    const meetingRef = doc(getFirebaseDb(), 'transcript', user.email, 'timestamps', meeting.id);
+                                    await updateDoc(meetingRef, {
+                                      actionItems: updatedActionItems
+                                    });
+                                    
+                                    // Update local state
+                                    setMeeting({ ...meeting, actionItems: updatedActionItems });
+                                    
+                                    toast({
+                                      title: item.done ? "Action item uncompleted" : "Action item completed",
+                                      description: item.title,
+                                    });
+                                  } catch (error) {
+                                    console.error('Error updating action item:', error);
+                                    toast({
+                                      title: "Error updating action item",
+                                      description: "Failed to update the action item status",
+                                      variant: "destructive",
+                                    });
+                                  }
+                                }}
+                                className={cn(
+                                  "h-5 w-5 rounded-full border-2",
+                                  item.done 
+                                    ? "border-purple-500 bg-purple-500 text-white" 
+                                    : "border-gray-300 dark:border-gray-600"
+                                )}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className={cn(
+                                  "text-sm font-medium text-gray-900 dark:text-gray-100",
+                                  item.done && "line-through text-gray-500 dark:text-gray-400"
+                                )}>
+                                  {item.title}
+                                </p>
+                                {item.description && (
+                                  <p className={cn(
+                                    "text-sm text-muted-foreground mt-1",
+                                    item.done && "line-through"
+                                  )}>
+                                    {item.description}
+                                  </p>
+                                )}
+                              </div>
+                            </motion.div>
+                          ))
+                        ) : (
+                          <div className="text-sm text-muted-foreground text-center py-6 bg-gray-50/50 dark:bg-gray-900/30 rounded-lg border border-dashed border-gray-200 dark:border-gray-800">
+                            <div className="flex flex-col items-center">
+                              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="text-purple-600 dark:text-purple-400">
+                                  <path d="M12 20h9"></path>
+                                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                                </svg>
+                              </div>
+                              <p>No action items for this meeting</p>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setShowCreateActionItem(true)} 
+                                className="mt-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
+                              >
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                Add your first action item
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     {/* Notes Section - Improved styling */}
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
