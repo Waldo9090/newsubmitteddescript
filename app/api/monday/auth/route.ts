@@ -2,13 +2,25 @@ import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { cookies } from 'next/headers';
 
-// Monday.com OAuth configuration
-const MONDAY_CLIENT_ID = process.env.MONDAY_CLIENT_ID || '9ae3e86e3d7b4b28d319ad66477fdb23';
-// Always use the production domain for OAuth flow since Monday.com app is registered with this domain
-const NEXT_PUBLIC_BASE_URL = 'https://www.aisummarizer-descript.com';
-const REDIRECT_URI = `${NEXT_PUBLIC_BASE_URL}/api/monday/callback`;
-// Detect environment for cookie settings only
-const isDevelopment = process.env.NODE_ENV === 'development';
+// Constants
+const MONDAY_CLIENT_ID = process.env.MONDAY_CLIENT_ID || '';
+const ENV = process.env.NODE_ENV || 'development';
+const IS_PRODUCTION = ENV === 'production';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001';
+const CUSTOM_DOMAIN = process.env.NEXT_PUBLIC_CUSTOM_DOMAIN || 'https://www.aisummarizer-descript.com';
+
+// Use the custom domain in production, otherwise use the base URL
+const REDIRECT_BASE = IS_PRODUCTION ? CUSTOM_DOMAIN : BASE_URL;
+const REDIRECT_URI = `${REDIRECT_BASE}/api/monday/callback`;
+
+console.log('Monday Auth Environment:', {
+  environment: ENV,
+  isProduction: IS_PRODUCTION,
+  baseUrl: BASE_URL,
+  customDomain: CUSTOM_DOMAIN,
+  redirectUri: REDIRECT_URI,
+  hasClientId: !!MONDAY_CLIENT_ID
+});
 
 export async function GET(request: Request) {
   try {
@@ -26,12 +38,12 @@ export async function GET(request: Request) {
     // Store the user email in a cookie for later retrieval in the callback
     const cookieStore = cookies();
     
-    // Set cookie with more compatible settings for development
-    cookieStore.set('user_email', userEmail, {
+    // Set cookie for user email
+    cookieStore.set('user_email', encodeURIComponent(userEmail), {
       httpOnly: true,
       // Only use secure in production
-      secure: !isDevelopment,
-      sameSite: isDevelopment ? 'lax' : 'lax',
+      secure: IS_PRODUCTION,
+      sameSite: 'lax',
       path: '/',
       maxAge: 60 * 15, // 15 minutes expiration, enough for OAuth flow
     });
@@ -39,12 +51,12 @@ export async function GET(request: Request) {
     // Generate a state parameter for security
     const state = randomBytes(16).toString('hex');
     
-    // Store the state in a cookie for verification in the callback
+    // Set cookie for state
     cookieStore.set('monday_oauth_state', state, {
       httpOnly: true,
       // Only use secure in production
-      secure: !isDevelopment,
-      sameSite: isDevelopment ? 'lax' : 'lax',
+      secure: IS_PRODUCTION,
+      sameSite: 'lax',
       path: '/',
       maxAge: 60 * 15, // 15 minutes expiration
     });

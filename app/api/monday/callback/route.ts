@@ -1,13 +1,32 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseDb } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { cookies } from 'next/headers';
 
-// Always use the production domain for OAuth flow since Monday.com app is registered with this domain
-const NEXT_PUBLIC_BASE_URL = 'https://www.aisummarizer-descript.com';
-// For local redirection after OAuth, use current environment
-const isDevelopment = process.env.NODE_ENV === 'development';
-const LOCAL_REDIRECT_BASE = isDevelopment ? 'http://localhost:3001' : NEXT_PUBLIC_BASE_URL;
+// Constants
+const MONDAY_CLIENT_ID = process.env.MONDAY_CLIENT_ID || '';
+const MONDAY_CLIENT_SECRET = process.env.MONDAY_CLIENT_SECRET || '';
+const ENV = process.env.NODE_ENV || 'development';
+const IS_PRODUCTION = ENV === 'production';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001';
+const CUSTOM_DOMAIN = process.env.NEXT_PUBLIC_CUSTOM_DOMAIN || 'https://www.aisummarizer-descript.com';
+
+// Use the custom domain in production, otherwise use the base URL
+const REDIRECT_BASE = IS_PRODUCTION ? CUSTOM_DOMAIN : BASE_URL;
+const REDIRECT_URI = `${REDIRECT_BASE}/api/monday/callback`;
+const LOCAL_REDIRECT_BASE = IS_PRODUCTION ? CUSTOM_DOMAIN : BASE_URL;
+
+// Log environment for debugging
+console.log('Monday Callback Environment:', {
+  environment: ENV,
+  isProduction: IS_PRODUCTION,
+  baseUrl: BASE_URL,
+  customDomain: CUSTOM_DOMAIN,
+  redirectUri: REDIRECT_URI,
+  localRedirectBase: LOCAL_REDIRECT_BASE,
+  hasClientId: !!MONDAY_CLIENT_ID,
+  hasClientSecret: !!MONDAY_CLIENT_SECRET
+});
 
 export async function GET(request: Request) {
   try {
@@ -55,9 +74,7 @@ export async function GET(request: Request) {
     }
 
     // Define Monday.com OAuth parameters
-    const MONDAY_CLIENT_ID = process.env.MONDAY_CLIENT_ID;
-    const MONDAY_CLIENT_SECRET = process.env.MONDAY_CLIENT_SECRET;
-    const REDIRECT_URI = `${NEXT_PUBLIC_BASE_URL}/api/monday/callback`;
+    const REDIRECT_URI = `${REDIRECT_BASE}/api/monday/callback`;
     
     console.log('Using redirect URI for token exchange:', REDIRECT_URI);
     
@@ -154,73 +171,63 @@ export async function GET(request: Request) {
     console.log('Storing token in Firestore for user:', userEmail);
     const db = getFirebaseDb();
     
-    // Log the data we're about to store (with partial token for security)
-    const integrationData = {
-      connected: true,
-      accessTokenFirstChars: tokenData.access_token ? tokenData.access_token.substring(0, 8) + '...' : 'missing',
-      hasRefreshToken: !!tokenData.refresh_token,
-      accountId: userData.data.me.account.id,
-      accountName: userData.data.me.account.name,
-      userId: userData.data.me.id,
-      userEmail: userData.data.me.email,
-      userName: userData.data.me.name,
-      expiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null,
-      connectedAt: new Date().toISOString()
-    };
-    
-    console.log('Monday.com integration data to store:', integrationData);
-    
-    // Check for required fields
-    if (!integrationData.accessTokenFirstChars.includes('...')) {
-      console.error('Access token is missing or invalid');
-      return Response.redirect(`${LOCAL_REDIRECT_BASE}/dashboard/integrations?error=invalid_access_token`);
-    }
-    
-    if (!integrationData.accountId || !integrationData.userId) {
-      console.error('Missing required integration data');
-      return Response.redirect(`${LOCAL_REDIRECT_BASE}/dashboard/integrations?error=missing_integration_data`);
-    }
-    
     try {
-      // Update the user document with mondayIntegration field
-      await setDoc(doc(db, 'users', userEmail), {
-        mondayIntegration: {
-          connected: true,
-          accessToken: tokenData.access_token,
-          refreshToken: tokenData.refresh_token || '',
-          accountId: userData.data.me.account.id,
-          accountName: userData.data.me.account.name,
-          userId: userData.data.me.id,
-          userEmail: userData.data.me.email,
-          userName: userData.data.me.name,
-          expiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null,
-          connectedAt: new Date().toISOString(),
-          updatedAt: serverTimestamp()
-        }
-      }, { merge: true });
+      // Get user doc - we're updating the doc directly now
+      const userDocRef = doc(db, 'users', userEmail);
+      const userDoc = await getDoc(userDocRef);
       
-      // After storing, verify the data was saved correctly
-      const verifyDoc = await getDoc(doc(db, 'users', userEmail));
-      if (verifyDoc.exists() && 
-          verifyDoc.data().mondayIntegration && 
-          verifyDoc.data().mondayIntegration.accessToken) {
-        console.log('Successfully verified Monday.com integration was saved to Firestore');
-      } else {
-        console.warn('Monday.com integration may not have been saved correctly');
+      console.log('Checking user doc exists:', { 
+        userDocExists: userDoc.exists(),
+        userEmail
+      });
+
+      if (!userDoc.exists()) {
+        console.error('User document does not exist:', userEmail);
+        return Response.redirect(`${LOCAL_REDIRECT_BASE}/dashboard/integrations?error=user_not_found`);
       }
       
-      console.log('Successfully saved Monday.com integration for user:', userEmail);
-    } catch (storeError) {
-      console.error('Error storing Monday.com integration data:', storeError);
-      return Response.redirect(`${LOCAL_REDIRECT_BASE}/dashboard/integrations?error=storage_failed`);
+      // Format integration data with Timestamps
+      const mondayIntegration = {
+        connected: true,
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token || '',
+        accountId: userData.data.me.account.id,
+        accountName: userData.data.me.account.name,
+        userId: userData.data.me.id,
+        userEmail: userData.data.me.email,
+        userName: userData.data.me.name,
+        expiresAt: tokenData.expires_in 
+          ? Timestamp.fromDate(new Date(Date.now() + tokenData.expires_in * 1000)) 
+          : null,
+        connectedAt: Timestamp.fromDate(new Date()),
+        updatedAt: serverTimestamp()
+      };
+      
+      console.log('Monday integration data prepared:', {
+        connected: mondayIntegration.connected,
+        tokenPresent: !!mondayIntegration.accessToken,
+        accountId: mondayIntegration.accountId,
+        accountName: mondayIntegration.accountName
+      });
+
+      // Update the user document with the mondayIntegration field directly
+      await updateDoc(userDocRef, {
+        mondayIntegration: mondayIntegration
+      });
+      
+      console.log('Successfully stored Monday token in Firestore');
+      
+      // Clear OAuth cookies
+      cookieStore.delete('user_email');
+      cookieStore.delete('monday_oauth_state');
+      
+      console.log('Redirecting to integrations page with email for token verification...');
+      // Redirect to the integrations page with a success message
+      return Response.redirect(`${LOCAL_REDIRECT_BASE}/dashboard/integrations?success=true&provider=monday&email=${encodeURIComponent(userEmail)}`);
+    } catch (error) {
+      console.error('Error in Monday OAuth callback:', error);
+      return Response.redirect(`${LOCAL_REDIRECT_BASE}/dashboard/integrations?error=unknown&details=${encodeURIComponent(error instanceof Error ? error.message : String(error))}`);
     }
-
-    // Clear OAuth cookies
-    cookieStore.delete('user_email');
-    cookieStore.delete('monday_oauth_state');
-
-    // Redirect back to the integrations page
-    return Response.redirect(`${LOCAL_REDIRECT_BASE}/dashboard/integrations?success=monday_connected`);
   } catch (error) {
     console.error('Error in Monday.com callback:', error);
     return Response.redirect(`${LOCAL_REDIRECT_BASE}/dashboard/integrations?error=unknown`);
