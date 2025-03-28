@@ -3,8 +3,12 @@ import { randomBytes } from 'crypto';
 import { cookies } from 'next/headers';
 
 // Attio OAuth configuration
-const ATTIO_CLIENT_ID = process.env.ATTIO_CLIENT_ID || 'b98e1808-8a21-4ac6-94af-e2fb4dfc79ce';
-const REDIRECT_URI = 'https://www.aisummarizer-descript.com/api/attio/callback';
+const ATTIO_CLIENT_ID = process.env.ATTIO_CLIENT_ID || '';
+// Always use the production domain for OAuth flow since Attio app is registered with this domain
+const NEXT_PUBLIC_BASE_URL = 'https://www.aisummarizer-descript.com';
+const REDIRECT_URI = `${NEXT_PUBLIC_BASE_URL}/api/attio/callback`;
+// Detect environment for cookie settings only
+const isDevelopment = process.env.NODE_ENV === 'development';
 
 export async function GET(request: Request) {
   try {
@@ -21,42 +25,53 @@ export async function GET(request: Request) {
 
     // Store the user email in a cookie for later retrieval in the callback
     const cookieStore = cookies();
-    cookieStore.set('attio_user_email', userEmail, {
+    
+    // Set cookie with more compatible settings for development
+    cookieStore.set('user_email', userEmail, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
+      // Only use secure in production
+      secure: !isDevelopment,
+      sameSite: isDevelopment ? 'lax' : 'lax',
       path: '/',
-      maxAge: 60 * 10, // 10 minutes expiration, enough for OAuth flow
+      maxAge: 60 * 15, // 15 minutes expiration, enough for OAuth flow
     });
     
-    // Generate a state parameter for security (CSRF protection)
+    // Generate a state parameter for security
     const state = randomBytes(16).toString('hex');
     
     // Store the state in a cookie for verification in the callback
     cookieStore.set('attio_oauth_state', state, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
+      // Only use secure in production
+      secure: !isDevelopment,
+      sameSite: isDevelopment ? 'lax' : 'lax',
       path: '/',
-      maxAge: 60 * 10, // 10 minutes expiration
+      maxAge: 60 * 15, // 15 minutes expiration
     });
 
-    // Construct the authorization URL for Attio
+    // Log the cookies being set for debugging
+    console.log('Setting cookies for Attio OAuth flow:');
+    console.log('- user_email:', userEmail);
+    console.log('- attio_oauth_state:', state);
+
+    // Construct the Authorization URL for Attio as per their docs
+    // https://app.attio.com/authorize
     const authUrl = `https://app.attio.com/authorize?` + new URLSearchParams({
       client_id: ATTIO_CLIENT_ID,
       redirect_uri: REDIRECT_URI,
-      response_type: 'code',
-      state: state,
+      response_type: 'code', // As specified in Attio docs, this should always be 'code'
+      state: state
     }).toString();
 
-    console.log('Generated Attio authorization URL:', authUrl);
+    console.log('Generated Attio auth URL:', authUrl);
+    console.log('Using redirect URI:', REDIRECT_URI);
 
     return NextResponse.json({ 
       url: authUrl,
       message: "Ready to connect to Attio."
     });
   } catch (error: any) {
-    console.error('Error in Attio auth route:', error);
+    console.error('Error in Attio auth:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 
