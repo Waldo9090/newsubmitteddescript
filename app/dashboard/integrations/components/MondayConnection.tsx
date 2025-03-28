@@ -111,31 +111,85 @@ export default function MondayConnection({
 
     try {
       setIsLoading(true);
+      console.log('Checking Monday.com connection for user:', user.email);
       
-      // Check if the user has a Monday.com integration in the new location
-      const mondayIntegrationDoc = await getDoc(doc(db, 'users', user.email, 'integrations', 'monday'));
+      // Check if the user has a Monday.com integration in the user document
+      const userDoc = await getDoc(doc(db, 'users', user.email));
       
-      if (mondayIntegrationDoc.exists() && mondayIntegrationDoc.data().connected) {
-        setIsConnected(true);
+      if (userDoc.exists()) {
+        console.log('User document found, checking for Monday integration');
+        const userData = userDoc.data();
         
-        // Fetch boards
-        await fetchBoards();
-        
-        // Set previously selected board and group if available
-        const mondayData = mondayIntegrationDoc.data();
-        if (mondayData.board) {
-          setSelectedBoard(mondayData.board);
-          setSelectedBoardName(mondayData.boardName || '');
+        if (userData.mondayIntegration && 
+            userData.mondayIntegration.connected && 
+            userData.mondayIntegration.accessToken) {
           
-          // Fetch groups for this board
-          await fetchGroups(mondayData.board);
+          // Log partial token for debugging
+          const tokenPreview = userData.mondayIntegration.accessToken.substring(0, 8) + '...';
+          console.log('Monday integration found with access token:', tokenPreview);
           
-          if (mondayData.group) {
-            setSelectedGroup(mondayData.group);
-            setSelectedGroupName(mondayData.groupName || '');
+          // Validate all required fields are present
+          const hasRequiredFields = 
+            userData.mondayIntegration.accountId && 
+            userData.mondayIntegration.userId;
+            
+          if (!hasRequiredFields) {
+            console.warn('Monday integration missing required fields');
+            setIsConnected(false);
+            return;
           }
+          
+          setIsConnected(true);
+          
+          // Log connection details
+          console.log('Monday.com connection details:', {
+            connected: userData.mondayIntegration.connected,
+            accountName: userData.mondayIntegration.accountName,
+            accountId: userData.mondayIntegration.accountId,
+            userName: userData.mondayIntegration.userName,
+            connectedAt: userData.mondayIntegration.connectedAt
+          });
+          
+          // Fetch boards
+          await fetchBoards();
+          
+          // Set previously selected board and group if available
+          const mondayData = userData.mondayIntegration;
+          if (mondayData.board) {
+            setSelectedBoard(mondayData.board);
+            setSelectedBoardName(mondayData.boardName || '');
+            
+            // Fetch groups for this board
+            await fetchGroups(mondayData.board);
+            
+            if (mondayData.group) {
+              setSelectedGroup(mondayData.group);
+              setSelectedGroupName(mondayData.groupName || '');
+            }
+          }
+
+          // Try to verify the token actually works
+          const isTokenValid = await verifyAccessToken(userData.mondayIntegration.accessToken);
+          if (!isTokenValid) {
+            console.warn('Monday.com token verification failed - token may be invalid or expired');
+            // We'll still proceed with the connection since the token exists,
+            // but log the warning for debugging
+          }
+        } else {
+          // Log specifically what's missing
+          if (!userData.mondayIntegration) {
+            console.log('No mondayIntegration object found');
+          } else if (!userData.mondayIntegration.connected) {
+            console.log('Monday integration exists but not connected');
+          } else if (!userData.mondayIntegration.accessToken) {
+            console.log('Monday integration exists but missing access token');
+          }
+          
+          console.log('No valid Monday integration found');
+          setIsConnected(false);
         }
       } else {
+        console.log('User document not found');
         setIsConnected(false);
       }
     } catch (error) {
@@ -199,6 +253,35 @@ export default function MondayConnection({
     }
   };
 
+  // Verify access token with a test API call
+  const verifyAccessToken = async (accessToken: string): Promise<boolean> => {
+    if (!accessToken) return false;
+    
+    try {
+      console.log('Verifying Monday.com access token...');
+      const response = await fetch('/api/monday/verify-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.email}`
+        },
+        body: JSON.stringify({ accessToken })
+      });
+      
+      if (!response.ok) {
+        console.error('Token verification failed with status:', response.status);
+        return false;
+      }
+      
+      const data = await response.json();
+      console.log('Token verification result:', data.valid);
+      return data.valid;
+    } catch (error) {
+      console.error('Error verifying Monday.com token:', error);
+      return false;
+    }
+  };
+
   // Handle board selection
   const handleBoardSelection = async (boardId: string) => {
     const selectedBoardData = boards.find(board => board.id === boardId);
@@ -222,7 +305,7 @@ export default function MondayConnection({
     const success = params.get('success');
     const error = params.get('error');
     
-    if (success === 'monday_connected' || success === 'true' && params.get('provider') === 'monday') {
+    if (success === 'monday_connected' || (success === 'true' && params.get('provider') === 'monday')) {
       toast.success('Successfully connected to Monday.com');
       // Remove the query parameters from the URL
       const url = new URL(window.location.href);
@@ -233,7 +316,7 @@ export default function MondayConnection({
       // Force refresh connection status
       checkConnection();
     } else if (error) {
-      if (error.startsWith('monday_') || error === 'token_exchange_failed' || error === 'app_not_installed') {
+      if (error.startsWith('monday_') || error === 'token_exchange_failed' || error === 'app_not_installed' || error === 'no_user_email') {
         toast.error(`Failed to connect to Monday.com: ${decodeURIComponent(error)}`);
       }
       
@@ -323,9 +406,11 @@ export default function MondayConnection({
 
     try {
       // Update user document to remove Monday.com integration
-      await setDoc(doc(db, 'users', user.email, 'integrations', 'monday'), {
-        connected: false,
-        disconnectedAt: new Date().toISOString()
+      await setDoc(doc(db, 'users', user.email), {
+        mondayIntegration: {
+          connected: false,
+          disconnectedAt: new Date().toISOString()
+        }
       }, { merge: true });
       
       setIsConnected(false);
@@ -371,20 +456,17 @@ export default function MondayConnection({
           onCancel();
         }
       } else {
-        // Save to user document using the update-config endpoint
-        const response = await fetch('/api/monday/update-config', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${user.email}`
-          },
-          body: JSON.stringify(configData)
-        });
+        // Save to user document directly under mondayIntegration
+        const userDoc = await getDoc(doc(db, 'users', user.email));
+        const currentIntegration = userDoc.exists() ? userDoc.data().mondayIntegration || {} : {};
         
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to update Monday.com configuration');
-        }
+        await setDoc(doc(db, 'users', user.email), {
+          mondayIntegration: {
+            ...currentIntegration,
+            ...configData,
+            updatedAt: new Date().toISOString()
+          }
+        }, { merge: true });
         
         toast.success('Monday.com configuration saved');
       }

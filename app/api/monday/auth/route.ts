@@ -4,8 +4,11 @@ import { cookies } from 'next/headers';
 
 // Monday.com OAuth configuration
 const MONDAY_CLIENT_ID = process.env.MONDAY_CLIENT_ID || '9ae3e86e3d7b4b28d319ad66477fdb23';
-const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.aisummarizer-descript.com';
+// Always use the production domain for OAuth flow since Monday.com app is registered with this domain
+const NEXT_PUBLIC_BASE_URL = 'https://www.aisummarizer-descript.com';
 const REDIRECT_URI = `${NEXT_PUBLIC_BASE_URL}/api/monday/callback`;
+// Detect environment for cookie settings only
+const isDevelopment = process.env.NODE_ENV === 'development';
 
 export async function GET(request: Request) {
   try {
@@ -22,12 +25,15 @@ export async function GET(request: Request) {
 
     // Store the user email in a cookie for later retrieval in the callback
     const cookieStore = cookies();
+    
+    // Set cookie with more compatible settings for development
     cookieStore.set('user_email', userEmail, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
+      // Only use secure in production
+      secure: !isDevelopment,
+      sameSite: isDevelopment ? 'lax' : 'lax',
       path: '/',
-      maxAge: 60 * 10, // 10 minutes expiration, enough for OAuth flow
+      maxAge: 60 * 15, // 15 minutes expiration, enough for OAuth flow
     });
     
     // Generate a state parameter for security
@@ -36,11 +42,17 @@ export async function GET(request: Request) {
     // Store the state in a cookie for verification in the callback
     cookieStore.set('monday_oauth_state', state, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
+      // Only use secure in production
+      secure: !isDevelopment,
+      sameSite: isDevelopment ? 'lax' : 'lax',
       path: '/',
-      maxAge: 60 * 10, // 10 minutes expiration
+      maxAge: 60 * 15, // 15 minutes expiration
     });
+
+    // Log the cookies being set for debugging
+    console.log('Setting cookies for OAuth flow:');
+    console.log('- user_email:', userEmail);
+    console.log('- monday_oauth_state:', state);
 
     // Standard OAuth URL for authorization
     const authUrl = `https://auth.monday.com/oauth2/authorize?` + new URLSearchParams({
@@ -51,6 +63,7 @@ export async function GET(request: Request) {
     }).toString();
 
     console.log('Generated Monday auth URL:', authUrl);
+    console.log('Using redirect URI:', REDIRECT_URI);
 
     return NextResponse.json({ 
       url: authUrl,
