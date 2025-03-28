@@ -15,11 +15,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    // Update the user's Attio integration to mark it as disconnected
+    // Update the user's Attio integration to mark it as disconnected directly in the user document
     const db = getFirebaseDb();
-    await setDoc(doc(db, 'users', userEmail, 'integrations', 'attio'), {
-      connected: false,
-      disconnectedAt: new Date().toISOString()
+    await setDoc(doc(db, 'users', userEmail), {
+      attioIntegration: {
+        connected: false,
+        disconnectedAt: new Date().toISOString()
+      }
     }, { merge: true });
 
     return NextResponse.json({ 

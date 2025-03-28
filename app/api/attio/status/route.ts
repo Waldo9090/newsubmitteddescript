@@ -15,19 +15,19 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    // Check if the user has a valid Attio integration
+    // Check if the user has a valid Attio integration - directly in the user document
     const db = getFirebaseDb();
-    const attioDocRef = doc(db, 'users', userEmail, 'integrations', 'attio');
-    const attioDoc = await getDoc(attioDocRef);
+    const userDocRef = doc(db, 'users', userEmail);
+    const userDoc = await getDoc(userDocRef);
 
-    if (!attioDoc.exists() || !attioDoc.data().connected) {
+    if (!userDoc.exists() || !userDoc.data().attioIntegration || !userDoc.data().attioIntegration.connected) {
       return NextResponse.json({ 
         connected: false,
         message: 'No active Attio connection found'
       });
     }
 
-    const attioData = attioDoc.data();
+    const attioData = userDoc.data().attioIntegration;
     
     // Check if token is expired
     if (attioData.expiresAt) {
@@ -45,11 +45,11 @@ export async function GET(request: Request) {
     return NextResponse.json({
       connected: true,
       workspace: {
-        id: attioData.workspace?.id || '',
-        name: attioData.workspace?.name || '',
-        logo: attioData.workspace?.logo || null
+        id: attioData.workspaceId || '',
+        name: attioData.workspaceName || '',
+        logo: attioData.workspaceLogo || null
       },
-      scopes: attioData.scopes || [],
+      scopes: attioData.scope?.split(' ') || [],
       connectedAt: attioData.connectedAt
     });
   } catch (error) {
